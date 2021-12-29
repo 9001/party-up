@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Party UP!</string>
+    <!-- Settings Activity Title -->
+
+    <!-- Preference Titles -->
+    <string name="connection_header">Connection</string>
+
+    <!-- Messages Preferences -->
+    <string name="title_activity_xfer">Party UP!</string>
+    <!-- Strings used for fragments for navigation -->
+</resources>
