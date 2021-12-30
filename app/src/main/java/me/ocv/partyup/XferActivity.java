@@ -52,10 +52,10 @@ public class XferActivity extends AppCompatActivity {
         file_size = -1;
         if (Intent.ACTION_SEND.equals(action) && type != null) {
             the_intent = intent;
-            if ("text/plain".equals(type)) {
-                handleSendText(); // Handle text being sent
+            if (intent.getStringExtra(Intent.EXTRA_TEXT) != null) {
+                handleSendText();
             } else {
-                handleSendImage(); // Handle single image being sent
+                handleSendImage();
             }
 
             FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
@@ -112,25 +112,34 @@ public class XferActivity extends AppCompatActivity {
             return;
         }
 
-        show_msg("Upload the following file?\n\n" + file_name + " (" + file_size + " B)");
-        //show_msg("Upload the following file?\n\n" + file_uri);
+        show_msg(String.format("Upload the following file?\n\n%s\n\nsize: %,d byte\ntype: %s",
+                file_name, file_size, the_intent.getType()));
     }
 
     private void do_up() {
         try {
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            String server_url = prefs.getString("server_url", "");
+            String url = prefs.getString("server_url", "");
+            show_msg("Sending to " + url);
+
+            if (!url.endsWith("/"))
+                url += "/";
+
+            if (file_size >= 0 && !file_name.isEmpty())
+                url += URLEncoder.encode(file_name, "UTF-8");
+
             String password = prefs.getString("server_password", "");
             if (password.equals("Default value"))
                 password = "";  // necessary in the emulator, not on real devices(?)
 
-            show_msg("Sending to " + server_url);
+            if (!password.isEmpty())
+                url += "?pw=" + password;
 
-            final String server_url2 = server_url + (password.isEmpty() ? "" : "?pw=" + password);
+            final String furl = url;
 
             Thread t = new Thread() {
                 public void run() {
-                    do_up2(server_url2);
+                    do_up2(furl);
                 }
             };
             t.start();
