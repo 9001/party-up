@@ -12,15 +12,19 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.provider.OpenableColumns;
 import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.preference.PreferenceManager;
 
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
 
@@ -29,9 +33,12 @@ public class XferActivity extends AppCompatActivity {
     private ActivityXferBinding binding;
     private Intent the_intent;
     private String the_msg;
+    private String base_url, full_url;
     private Uri file_uri;
     private String file_name;
     private long file_size;
+    private String the_desc;
+    private boolean upping;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +53,7 @@ public class XferActivity extends AppCompatActivity {
         String action = intent.getAction();
         String type = intent.getType();
 
+        upping = false;
         the_msg = null;
         file_uri = null;
         file_name = null;
@@ -58,10 +66,11 @@ public class XferActivity extends AppCompatActivity {
                 handleSendImage();
             }
 
-            FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+            final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
             fab.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    fab.setVisibility(View.INVISIBLE);
                     do_up();
                 }
             });
@@ -74,6 +83,16 @@ public class XferActivity extends AppCompatActivity {
 
     private void show_msg(String txt) {
         ((TextView)findViewById(R.id.upper_info)).setText(txt);
+    }
+
+    private void tshow_msg(String txt) {
+        final TextView tv = (TextView)findViewById(R.id.upper_info);
+        tv.post(new Runnable() {
+            @Override
+            public void run() {
+                tv.setText(txt);
+            }
+        });
     }
 
     private void handleSendText() {
@@ -112,49 +131,50 @@ public class XferActivity extends AppCompatActivity {
             return;
         }
 
-        show_msg(String.format("Upload the following file?\n\n%s\n\nsize: %,d byte\ntype: %s",
-                file_name, file_size, the_intent.getType()));
+        the_desc = String.format("%s\n\nsize: %,d byte\ntype: %s", file_name, file_size, the_intent.getType());
+
+        show_msg("Upload the following file?\n\n" + the_desc);
     }
 
     private void do_up() {
+        if (upping)
+            return;
+
+        upping = true;
+
         try {
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-            String url = prefs.getString("server_url", "");
-            show_msg("Sending to " + url);
+            base_url = full_url = prefs.getString("server_url", "");
+            show_msg("Sending to " + base_url + " ...\n\n" + the_desc);
 
-            if (!url.endsWith("/"))
-                url += "/";
+            if (!full_url.endsWith("/"))
+                full_url += "/";
 
             if (file_size >= 0 && !file_name.isEmpty())
-                url += URLEncoder.encode(file_name, "UTF-8");
+                full_url += URLEncoder.encode(file_name, "UTF-8");
 
             String password = prefs.getString("server_password", "");
             if (password.equals("Default value"))
                 password = "";  // necessary in the emulator, not on real devices(?)
 
             if (!password.isEmpty())
-                url += "?pw=" + password;
-
-            final String furl = url;
+                full_url += "?pw=" + password;
 
             Thread t = new Thread() {
                 public void run() {
-                    do_up2(furl);
+                    do_up2();
                 }
             };
             t.start();
-            t.join();
-            // android: throws exception if you do network stuff on the main thread
-            // also android: deletes the file handle when the main thread finishes
         }
         catch (Exception ex) {
             show_msg("Error: " + ex.toString());
         }
     }
 
-    private void do_up2(String server_url) {
+    private void do_up2() {
         try {
-            URL url = new URL(server_url);
+            URL url = new URL(full_url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
             if (the_msg != null)
@@ -163,7 +183,7 @@ public class XferActivity extends AppCompatActivity {
                 do_fileput(conn);
         }
         catch (Exception ex) {
-            show_msg("Error: " + ex.toString());
+            tshow_msg("Error: " + ex.toString());
         }
     }
 
@@ -185,18 +205,64 @@ public class XferActivity extends AppCompatActivity {
         conn.setFixedLengthStreamingMode(file_size);
         conn.setRequestProperty("Content-Type", "application/octet-stream");
         conn.connect();
+        final TextView tv = (TextView)findViewById(R.id.upper_info);
         OutputStream os = conn.getOutputStream();
         InputStream ins = getContentResolver().openInputStream(file_uri);
+        MessageDigest md = MessageDigest.getInstance("SHA-512");
         byte[] buf = new byte[128 * 1024];
+        long bytes_done = 0;
         while (true) {
             int n = ins.read(buf);
             if (n <= 0)
                 break;
 
+            bytes_done += n;
             os.write(buf, 0, n);
+            md.update(buf, 0, n);
+
+            final long meme = bytes_done;
+            tv.post(new Runnable() {
+                @Override
+                public void run() {
+                    double perc = ((double) meme * 100) / file_size;
+                    tv.setText(String.format("Sending to %s ...\n\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nprogress:  %.2f %%",
+                            base_url,
+                            the_desc,
+                            meme,
+                            file_size - meme,
+                            perc
+                    ));
+                    ((ProgressBar)findViewById(R.id.progbar)).setProgress((int)Math.round(perc));
+                }
+            });
         }
         os.flush();
+        int rc = conn.getResponseCode();
+        if (rc >= 300) {
+            int n = conn.getErrorStream().read(buf);
+            tshow_msg("Server error " + rc + ":\n" + new String(buf, 0, n, "UTF-8"));
+            conn.disconnect();
+            return;
+        }
+        String sha = "";
+        byte[] bsha = md.digest();
+        for (int a = 0; a < 28; a++)
+            sha += String.format("%02x", bsha[a]);
+
+        String line, line2 = "<null>";
+        boolean ok = false;
+        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        while ((line = br.readLine()) != null)
+            if (line.indexOf(sha) >= 0)
+                ok = true;
+            else
+                line2 = line;
+
         conn.disconnect();
-        finishAndRemoveTask();
+        if (ok) {
+            finishAndRemoveTask();
+            return;
+        }
+        tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + line2 + " expected\n" + sha + " from server");
     }
 }

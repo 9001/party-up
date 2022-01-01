@@ -4,7 +4,7 @@ upload files and links to a copyparty server by sharing them to this app
 
 primarily made for this year's meadup, letting a room full of nerds throw memes onto the big screen
 
-only the PUT API is implemented for now so there is no integrity checks or resumable uploads yet
+only the PUT API is implemented for now so there is no resumable uploads yet
 
 
 ## basic usage
@@ -34,8 +34,3 @@ check the startup script in the very-bad-idea docstring for some bonus features,
 * make chrome autoplay audio on all pages
 
 also [twitter-unmute.user.js](https://github.com/9001/copyparty/blob/hovudstraum/bin/mtag/res/twitter-unmute.user.js) to play twitter links with audio
-
-
-# known issues
-
-* sharing large files (over 100 MiB or so) is probably a bad idea
