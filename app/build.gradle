@@ -17,8 +17,8 @@ android {
         applicationId "me.ocv.partyup"
         minSdk 28
         targetSdk 28
-        versionCode 10200
-        versionName "1.2.0"
+        versionCode 10201
+        versionName "1.2.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         signingConfig signingConfigs.release
