@@ -1,0 +1,3 @@
+• new: progressbar
+• new: integrity check after upload completes
+• bugfix: disable upload button when tapped (prevent dupes)

@@ -1,0 +1,12 @@
+Send files and links to a <a href="https://github.com/9001/copyparty">copyparty</a> server by sharing them to this app
+
+<b>Features:</b><ul>
+<li>sha512-verified uploads</li>
+<li>stash links and plaintext</li>
+<li>supports HTTP and HTTPS</li></ul>
+
+<b>Future ideas:</b><ul>
+<li>upload slicing (resumable + usually faster)</li>
+<li>display/copy link to the uploaded files</li></ul>
+
+This can be used to turn a raspi into a very flexible chromecast clone; see <a href="https://github.com/9001/party-up">the readme</a> for details

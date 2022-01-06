@@ -1,0 +1,4 @@
+• new: keep filenames when uploading
+• new: support uploading all filetypes
+• new: show app-version in the settings page
+• new: ame
