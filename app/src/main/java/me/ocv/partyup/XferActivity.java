@@ -1,5 +1,8 @@
 package me.ocv.partyup;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -11,10 +14,13 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.provider.OpenableColumns;
+import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.preference.PreferenceManager;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -25,20 +31,23 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.stream.Collectors;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
+import me.ocv.partyup.databinding.ContentXferBinding;
 
 public class XferActivity extends AppCompatActivity {
 
-    private ActivityXferBinding binding;
-    private Intent the_intent;
-    private String the_msg;
-    private String base_url, full_url;
-    private Uri file_uri;
-    private String file_name;
-    private long file_size;
-    private String the_desc;
-    private boolean upping;
+    ActivityXferBinding binding;
+    SharedPreferences prefs;
+    Intent the_intent;
+    String the_msg;
+    String base_url, full_url, share_url;
+    Uri file_uri;
+    String file_name;
+    long file_size;
+    String the_desc;
+    boolean upping;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +57,8 @@ public class XferActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         setSupportActionBar(binding.toolbar);
+
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         Intent intent = getIntent();
         String action = intent.getAction();
@@ -70,7 +81,7 @@ public class XferActivity extends AppCompatActivity {
             fab.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    fab.setVisibility(View.INVISIBLE);
+                    fab.setVisibility(View.GONE);
                     do_up();
                 }
             });
@@ -143,7 +154,6 @@ public class XferActivity extends AppCompatActivity {
         upping = true;
 
         try {
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
             base_url = full_url = prefs.getString("server_url", "");
             show_msg("Sending to " + base_url + " ...\n\n" + the_desc);
 
@@ -196,8 +206,22 @@ public class XferActivity extends AppCompatActivity {
         OutputStream os = conn.getOutputStream();
         os.write(body);
         os.flush();
+        int rc = conn.getResponseCode();
+        share_url = "HTTP " + rc;
+        if (rc >= 300) {
+            byte[] buf = new byte[1024];
+            int n = Math.max(0, conn.getErrorStream().read(buf));
+            tshow_msg("Server error " + rc + ":\n" + new String(buf, 0, n, "UTF-8"));
+            conn.disconnect();
+            return;
+        }
         conn.disconnect();
-        finishAndRemoveTask();
+        findViewById(R.id.upper_info).post(new Runnable() {
+            @Override
+            public void run() {
+                onsuccess(false);
+            }
+        });
     }
 
     private void do_fileput(HttpURLConnection conn) throws Exception {
@@ -205,7 +229,7 @@ public class XferActivity extends AppCompatActivity {
         conn.setFixedLengthStreamingMode(file_size);
         conn.setRequestProperty("Content-Type", "application/octet-stream");
         conn.connect();
-        final TextView tv = (TextView)findViewById(R.id.upper_info);
+        final TextView tv = (TextView) findViewById(R.id.upper_info);
         OutputStream os = conn.getOutputStream();
         InputStream ins = getContentResolver().openInputStream(file_uri);
         MessageDigest md = MessageDigest.getInstance("SHA-512");
@@ -232,14 +256,14 @@ public class XferActivity extends AppCompatActivity {
                             file_size - meme,
                             perc
                     ));
-                    ((ProgressBar)findViewById(R.id.progbar)).setProgress((int)Math.round(perc));
+                    ((ProgressBar) findViewById(R.id.progbar)).setProgress((int) Math.round(perc));
                 }
             });
         }
         os.flush();
         int rc = conn.getResponseCode();
         if (rc >= 300) {
-            int n = conn.getErrorStream().read(buf);
+            int n = Math.max(0, conn.getErrorStream().read(buf));
             tshow_msg("Server error " + rc + ":\n" + new String(buf, 0, n, "UTF-8"));
             conn.disconnect();
             return;
@@ -249,20 +273,85 @@ public class XferActivity extends AppCompatActivity {
         for (int a = 0; a < 28; a++)
             sha += String.format("%02x", bsha[a]);
 
-        String line, line2 = "<null>";
-        boolean ok = false;
         BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        while ((line = br.readLine()) != null)
-            if (line.indexOf(sha) >= 0)
-                ok = true;
-            else
-                line2 = line;
-
+        String[] lines = br.lines().collect(Collectors.toList()).toArray(new String[0]);
         conn.disconnect();
-        if (ok) {
+
+        if (lines.length < 3) {
+            tshow_msg("SERVER ERROR:\n" + lines[0]);
+            return;
+        }
+        if (lines[2].indexOf(sha) != 0) {
+            tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server");
+            return;
+        }
+        if (lines.length > 3 && !lines[3].isEmpty())
+            share_url = lines[3];
+        else
+            share_url = full_url.split("\\?")[0];
+
+        tv.post(new Runnable() {
+            @Override
+            public void run() {
+                onsuccess(true);
+            }
+        });
+    }
+
+    void onsuccess(Boolean upload) {
+        show_msg("✅ 👍\n\nCompleted successfully\n\n" + share_url);
+        ((TextView)findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
+
+        if (prefs.getBoolean("autoclose", false)) {
             finishAndRemoveTask();
             return;
         }
-        tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + line2 + " expected\n" + sha + " from server");
+
+        findViewById(R.id.progbar).setVisibility(View.GONE);
+        findViewById(R.id.successbuttons).setVisibility(View.VISIBLE);
+
+        Button btn = (Button)findViewById(R.id.btnExit);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                finishAndRemoveTask();
+            }
+        });
+
+        if (!upload) {
+            findViewById(R.id.btnCopyLink).setVisibility(View.GONE);
+            findViewById(R.id.btnShareLink).setVisibility(View.GONE);
+            return;
+        }
+
+        btn = (Button)findViewById(R.id.btnCopyLink);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData cd = ClipData.newPlainText("copyparty upload", share_url);
+                Toast.makeText(getApplicationContext(), "Link copied", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        btn = (Button)findViewById(R.id.btnShareLink);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent send = new Intent(Intent.ACTION_SEND);
+                send.setType("text/plain");
+                send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
+                send.putExtra(Intent.EXTRA_TEXT, share_url);
+                //startActivity(Intent.createChooser(send, "Share file link"));
+
+                Intent view = new Intent(Intent.ACTION_VIEW);
+                view.setData(Uri.parse(share_url));
+
+                Intent i = Intent.createChooser(send, "Share file link");
+                i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { view });
+                startActivity(i);
+            }
+        });
     }
 }

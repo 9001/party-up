@@ -1,12 +1,12 @@
 Send filer og lenker til en <a href="https://github.com/9001/copyparty">copyparty</a>-server ved å dele dem til denne appen
 
-<b>Funksjoner per nu:</b><ul>
-<li>sha512 garanterer at ting kommer helskinnet frem</li>
-<li>arkivering av linker og annen klartekst</li>
-<li>tar både HTTP og HTTPS</li></ul>
+<b>Funksjoner per nu:</b>
+• sha512 garanterer at ting kommer helskinnet frem
+• arkivering av linker og annen klartekst
+• vise/kopiere link til det som er lastet opp
+• tar både HTTP og HTTPS
 
-<b>Én gang i fremtiden:</b><ul>
-<li>oppdeling av filer (ofte raskere, samt mulighet for å gjenoppta avbrutte opplastninger)</li>
-<li>vise/kopiere link til det som er lastet opp</li></ul>
+<b>Én gang i fremtiden:</b>
+• oppdeling av filer (ofte raskere, samt mulighet for å gjenoppta avbrutte opplastninger)
 
 Kan forøvrig brukes for å gjøre en raspi om til en særdeles fleksibel chromecast-aktig sak; se <a href="https://github.com/9001/party-up">readme'n</a> for litt mer info

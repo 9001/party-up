@@ -69,11 +69,46 @@
             android:layout_height="wrap_content"
             android:layout_weight="1" />
 
+        <LinearLayout
+            android:id="@+id/successbuttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btnCopyLink"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:text="copy\nlink" />
+
+            <Button
+                android:id="@+id/btnShareLink"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:text="share\nlink" />
+
+            <Button
+                android:id="@+id/btnExit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:text="close\napp" />
+        </LinearLayout>
+
         <ProgressBar
             android:id="@+id/progbar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:scaleY="5" />
+
     </LinearLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout

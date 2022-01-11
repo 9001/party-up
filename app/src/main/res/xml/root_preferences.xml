@@ -19,13 +19,21 @@
             app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
+    <PreferenceCategory android:title="Behavior">
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="autoclose"
+            android:title="Autoclose"
+            app:summary="Quit on successful upload" />
+    </PreferenceCategory>
     <PreferenceCategory android:title="About">
 
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="lbl_bver"
+            android:summary="1.3.0"
+            android:title="Version" />
     </PreferenceCategory>
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:key="lbl_bver"
-        android:summary="1.2.1"
-        android:title="Version" />
 
 </PreferenceScreen>

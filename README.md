@@ -1,6 +1,8 @@
 # Party UP!
 
-upload files and links to a copyparty server by sharing them to this app
+<a href="https://f-droid.org/packages/me.ocv.partyup/"><img src="https://ocv.me/fdroid.png" alt="Get it on F-Droid" height="50" /> '' <img src="https://img.shields.io/f-droid/v/me.ocv.partyup.svg" alt="f-droid version info" /></a> '' <a href="https://github.com/9001/party-up"><img src="https://img.shields.io/github/release/9001/party-up.svg?logo=github" alt="github version info" /></a>
+
+upload files and links to a [copyparty](https://github.com/9001/copyparty) server by sharing them to this app
 
 primarily made for this year's meadup, letting a room full of nerds throw memes onto the big screen
 
