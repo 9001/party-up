@@ -42,9 +42,9 @@ public class XferActivity extends AppCompatActivity {
     Intent the_intent;
     String the_msg;
     String base_url, full_url, share_url;
-    Uri file_uri;
-    String file_name;
-    long file_size;
+    Uri src_uri;
+    String src_name;
+    long src_size;
     String the_desc;
     boolean upping;
 
@@ -59,36 +59,38 @@ public class XferActivity extends AppCompatActivity {
 
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        Intent intent = getIntent();
-        String action = intent.getAction();
-        String type = intent.getType();
+        the_intent = getIntent();
+        String action = the_intent.getAction();
+        String type = the_intent.getType();
 
-        upping = false;
-        the_msg = null;
-        file_uri = null;
-        file_name = null;
-        file_size = -1;
-        if (Intent.ACTION_SEND.equals(action) && type != null) {
-            the_intent = intent;
-            if (intent.getStringExtra(Intent.EXTRA_TEXT) != null) {
-                handleSendText();
-            } else {
-                handleSendImage();
-            }
-
-            final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-            fab.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    fab.setVisibility(View.GONE);
-                    do_up();
-                }
-            });
-
+        if (!the_intent.ACTION_SEND.equals(action) || type == null) {
+            show_msg("cannot share this content");
             return;
         }
 
-        show_msg("cannot share this content");
+        upping = false;
+        the_msg = null;
+        src_name = null;
+        src_size = -1;
+        src_uri = (Uri)the_intent.getParcelableExtra(Intent.EXTRA_STREAM);
+        the_msg = the_intent.getStringExtra(Intent.EXTRA_TEXT);
+        if (src_uri != null) {
+            handleSendImage();
+        } else if (the_msg != null) {
+            handleSendText();
+        } else {
+            show_msg("cannot decide on what to send for " + type);
+            return;
+        }
+
+        final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                fab.setVisibility(View.GONE);
+                do_up();
+            }
+        });
     }
 
     private void show_msg(String txt) {
@@ -105,26 +107,51 @@ public class XferActivity extends AppCompatActivity {
         });
     }
 
+    String getext(String mime) {
+        if (mime == null)
+            return "bin";
+
+        mime = mime.replace(';', ' ').split(" ")[0];
+
+        switch (mime) {
+            case "audio/ogg": return "ogg";
+            case "audio/mpeg": return "mp3";
+            case "audio/mp4": return "m4a";
+            case "image/jpeg": return "jpg";
+        }
+
+        if (mime.startsWith("text/"))
+            return "txt";
+
+        if (mime.contains("/")) {
+            mime = mime.split("/")[1];
+            if (!mime.contains(".") && mime.length() < 8)
+                return mime;
+        }
+
+        return "bin";
+    }
+
     private void handleSendText() {
-        the_msg = the_intent.getStringExtra(Intent.EXTRA_TEXT);
         show_msg("Post the following link?\n\n" + the_msg);
     }
 
     private void handleSendImage() {
-        file_uri = (Uri)the_intent.getParcelableExtra(Intent.EXTRA_STREAM);
-
         // the following code returns the wrong filesize (off by 626 bytes)
-        Cursor cur = getContentResolver().query(file_uri, null, null, null, null);
+        Cursor cur = getContentResolver().query(src_uri, null, null, null, null);
         int iname = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
         int isize = cur.getColumnIndex(OpenableColumns.SIZE);
         cur.moveToFirst();
-        file_name = cur.getString(iname);
-        file_size = cur.getLong(isize);
+        src_name = cur.getString(iname);
+        src_size = cur.getLong(isize);
         cur.close();
+
+        if (src_name == null)
+            src_name = "mystery-file." + getext(the_intent.getType());
 
         // get correct filesize
         try {
-            InputStream ins = getContentResolver().openInputStream(file_uri);
+            InputStream ins = getContentResolver().openInputStream(src_uri);
             byte[] buf = new byte[128 * 1024];
             long sz = 0;
             while (true) {
@@ -134,14 +161,14 @@ public class XferActivity extends AppCompatActivity {
 
                 sz += n;
             }
-            file_size = sz;
+            src_size = sz;
         }
         catch (Exception ex) {
             show_msg("Error: " + ex.toString());
             return;
         }
 
-        the_desc = String.format("%s\n\nsize: %,d byte\ntype: %s", file_name, file_size, the_intent.getType());
+        the_desc = String.format("%s\n\nsize: %,d byte\ntype: %s", src_name, src_size, the_intent.getType());
 
         show_msg("Upload the following file?\n\n" + the_desc);
     }
@@ -159,8 +186,8 @@ public class XferActivity extends AppCompatActivity {
             if (!full_url.endsWith("/"))
                 full_url += "/";
 
-            if (file_size >= 0 && !file_name.isEmpty())
-                full_url += URLEncoder.encode(file_name, "UTF-8");
+            if (src_size >= 0 && !src_name.isEmpty())
+                full_url += URLEncoder.encode(src_name, "UTF-8");
 
             String password = prefs.getString("server_password", "");
             if (password.equals("Default value"))
@@ -186,10 +213,10 @@ public class XferActivity extends AppCompatActivity {
             URL url = new URL(full_url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
-            if (the_msg != null)
-                do_textmsg(conn);
-            else
+            if (src_uri != null)
                 do_fileput(conn);
+            else
+                do_textmsg(conn);
         }
         catch (Exception ex) {
             tshow_msg("Error: " + ex.toString());
@@ -225,12 +252,12 @@ public class XferActivity extends AppCompatActivity {
 
     private void do_fileput(HttpURLConnection conn) throws Exception {
         conn.setRequestMethod("PUT");
-        conn.setFixedLengthStreamingMode(file_size);
+        conn.setFixedLengthStreamingMode(src_size);
         conn.setRequestProperty("Content-Type", "application/octet-stream");
         conn.connect();
         final TextView tv = (TextView) findViewById(R.id.upper_info);
         OutputStream os = conn.getOutputStream();
-        InputStream ins = getContentResolver().openInputStream(file_uri);
+        InputStream ins = getContentResolver().openInputStream(src_uri);
         MessageDigest md = MessageDigest.getInstance("SHA-512");
         byte[] buf = new byte[128 * 1024];
         long bytes_done = 0;
@@ -247,12 +274,12 @@ public class XferActivity extends AppCompatActivity {
             tv.post(new Runnable() {
                 @Override
                 public void run() {
-                    double perc = ((double) meme * 100) / file_size;
+                    double perc = ((double) meme * 100) / src_size;
                     tv.setText(String.format("Sending to %s ...\n\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nprogress:  %.2f %%",
                             base_url,
                             the_desc,
                             meme,
-                            file_size - meme,
+                            src_size - meme,
                             perc
                     ));
                     ((ProgressBar) findViewById(R.id.progbar)).setProgress((int) Math.round(perc));
