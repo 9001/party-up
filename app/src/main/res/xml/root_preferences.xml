@@ -23,9 +23,14 @@
 
         <CheckBoxPreference
             android:defaultValue="false"
+            android:key="autosend"
+            android:title="Just go"
+            app:summary="Upload right away, don't ask" />
+        <CheckBoxPreference
+            android:defaultValue="false"
             android:key="autoclose"
-            android:title="Autoclose"
-            app:summary="Quit on successful upload" />
+            android:title="Close on success"
+            app:summary="Exit if the upload is confirmed OK" />
     </PreferenceCategory>
 
 </PreferenceScreen>

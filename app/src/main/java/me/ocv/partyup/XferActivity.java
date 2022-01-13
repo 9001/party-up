@@ -134,6 +134,8 @@ public class XferActivity extends AppCompatActivity {
 
     private void handleSendText() {
         show_msg("Post the following link?\n\n" + the_msg);
+        if (prefs.getBoolean("autosend", false))
+            do_up();
     }
 
     private void handleSendImage() {
@@ -171,6 +173,8 @@ public class XferActivity extends AppCompatActivity {
         the_desc = String.format("%s\n\nsize: %,d byte\ntype: %s", src_name, src_size, the_intent.getType());
 
         show_msg("Upload the following file?\n\n" + the_desc);
+        if (prefs.getBoolean("autosend", false))
+            do_up();
     }
 
     private void do_up() {
@@ -329,6 +333,7 @@ public class XferActivity extends AppCompatActivity {
         ((TextView)findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
 
         if (prefs.getBoolean("autoclose", false)) {
+            Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
             finishAndRemoveTask();
             return;
         }
