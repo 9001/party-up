@@ -1,0 +1,2 @@
+• new: option to skip all questions when uploading
+• new: support sharing from more apps
