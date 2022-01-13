@@ -27,13 +27,5 @@
             android:title="Autoclose"
             app:summary="Quit on successful upload" />
     </PreferenceCategory>
-    <PreferenceCategory android:title="About">
-
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="lbl_bver"
-            android:summary="1.3.0"
-            android:title="Version" />
-    </PreferenceCategory>
 
 </PreferenceScreen>

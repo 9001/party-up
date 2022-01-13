@@ -34,7 +34,6 @@ import java.security.MessageDigest;
 import java.util.stream.Collectors;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
-import me.ocv.partyup.databinding.ContentXferBinding;
 
 public class XferActivity extends AppCompatActivity {
 
