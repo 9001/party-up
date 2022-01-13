@@ -28,7 +28,7 @@ public class MainActivity extends AppCompatActivity {
         tv.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
         tv.setMovementMethod(LinkMovementMethod.getInstance());
 
-        ((Button)findViewById(R.id.button)).setOnClickListener(new View.OnClickListener() {
+        ((Button)findViewById(R.id.settingsBtn)).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Intent i = new Intent(MainActivity.this, SettingsActivity.class);
