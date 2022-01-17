@@ -11,6 +11,8 @@ only the PUT API is implemented for now so there is no resumable uploads yet
 
 ## basic usage
 
+![screenshots showing the workflow of sharing a picture to this app](metadata/en-US/images/featureGraphic.png)
+
 * install the app
 * open it and set your server url (and password if applicable)
 
