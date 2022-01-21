@@ -1,6 +1,8 @@
 package me.ocv.partyup;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.MenuItem;
 
 import androidx.appcompat.app.ActionBar;
@@ -22,6 +24,12 @@ public class SettingsActivity extends AppCompatActivity {
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        if (prefs.getString("on_up_ok", "menu").equals("menu")) {
+            SharedPreferences.Editor ed = prefs.edit();
+            ed.putString("on_up_ok", "menu");
+            ed.commit();
         }
     }
 

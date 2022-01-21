@@ -21,16 +21,18 @@
     </PreferenceCategory>
     <PreferenceCategory android:title="Behavior">
 
-        <CheckBoxPreference
+        <SwitchPreference
             android:defaultValue="false"
             android:key="autosend"
             android:title="Just go"
             app:summary="Upload right away, don't ask" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="autoclose"
-            android:title="Close on success"
-            app:summary="Exit if the upload is confirmed OK" />
+        <ListPreference
+            android:defaultValue="close"
+            android:entries="@array/vonsuccess"
+            android:entryValues="@array/konsuccess"
+            android:key="on_up_ok"
+            android:title="On upload success..."
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
 </PreferenceScreen>

@@ -1,3 +1,15 @@
 <resources>
-    <string name="app_name">Party UP!</string>
+    <string name="app_name">Party UP! dbg</string>
+    <string-array name="konsuccess">
+        <item>menu</item>
+        <item>copy</item>
+        <item>share</item>
+        <item>exit</item>
+    </string-array>
+    <string-array name="vonsuccess">
+        <item>Show menu (default)</item>
+        <item>Copy file link</item>
+        <item>Share file link</item>
+        <item>Exit app</item>
+    </string-array>
 </resources>

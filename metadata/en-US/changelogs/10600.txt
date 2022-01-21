@@ -1,0 +1,2 @@
+• new: choose what happens when an upload succeeds
+• new: add http:// to the server URL if missing

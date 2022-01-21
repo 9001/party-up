@@ -31,6 +31,7 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.stream.Collectors;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
@@ -40,6 +41,7 @@ public class XferActivity extends AppCompatActivity {
     ActivityXferBinding binding;
     SharedPreferences prefs;
     Intent the_intent;
+    String password;
     String the_msg;
     String base_url, full_url, share_url;
     Uri src_uri;
@@ -166,7 +168,7 @@ public class XferActivity extends AppCompatActivity {
             src_size = sz;
         }
         catch (Exception ex) {
-            show_msg("Error: " + ex.toString());
+            show_msg("Error3: " + ex.toString());
             return;
         }
 
@@ -184,7 +186,11 @@ public class XferActivity extends AppCompatActivity {
         upping = true;
 
         try {
-            base_url = full_url = prefs.getString("server_url", "");
+            base_url = prefs.getString("server_url", "");
+            if (!base_url.startsWith("http"))
+                base_url = "http://" + base_url;
+
+            full_url = base_url;
             show_msg("Sending to " + base_url + " ...\n\n" + the_desc);
 
             if (!full_url.endsWith("/"))
@@ -193,12 +199,9 @@ public class XferActivity extends AppCompatActivity {
             if (src_size >= 0 && !src_name.isEmpty())
                 full_url += URLEncoder.encode(src_name, "UTF-8");
 
-            String password = prefs.getString("server_password", "");
+            password = prefs.getString("server_password", "");
             if (password.equals("Default value"))
                 password = "";  // necessary in the emulator, not on real devices(?)
-
-            if (!password.isEmpty())
-                full_url += "?pw=" + password;
 
             Thread t = new Thread() {
                 public void run() {
@@ -208,7 +211,7 @@ public class XferActivity extends AppCompatActivity {
             t.start();
         }
         catch (Exception ex) {
-            show_msg("Error: " + ex.toString());
+            show_msg("Error1: " + ex.toString());
         }
     }
 
@@ -217,13 +220,26 @@ public class XferActivity extends AppCompatActivity {
             URL url = new URL(full_url);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setDoOutput(true);
+            if (!password.isEmpty())
+                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.getEncoder().encode(password.getBytes())));
+
             if (src_uri != null)
                 do_fileput(conn);
             else
                 do_textmsg(conn);
         }
         catch (Exception ex) {
-            tshow_msg("Error: " + ex.toString());
+            tshow_msg("Error2: " + ex.toString() + "\n\nmaybe wrong password?");
+        }
+    }
+
+    String read_err(HttpURLConnection conn) {
+        try {
+            byte[] buf = new byte[1024];
+            int n = Math.max(0, conn.getErrorStream().read(buf));
+            return new String(buf, 0, n, "UTF-8");
+        } catch (Exception ex) {
+            return ex.toString();
         }
     }
 
@@ -239,9 +255,7 @@ public class XferActivity extends AppCompatActivity {
         int rc = conn.getResponseCode();
         share_url = "HTTP " + rc;
         if (rc >= 300) {
-            byte[] buf = new byte[1024];
-            int n = Math.max(0, conn.getErrorStream().read(buf));
-            tshow_msg("Server error " + rc + ":\n" + new String(buf, 0, n, "UTF-8"));
+            tshow_msg("Server error " + rc + ":\n" + read_err(conn));
             conn.disconnect();
             return;
         }
@@ -293,8 +307,7 @@ public class XferActivity extends AppCompatActivity {
         os.flush();
         int rc = conn.getResponseCode();
         if (rc >= 300) {
-            int n = Math.max(0, conn.getErrorStream().read(buf));
-            tshow_msg("Server error " + rc + ":\n" + new String(buf, 0, n, "UTF-8"));
+            tshow_msg("Server error " + rc + ":\n" + read_err(conn));
             conn.disconnect();
             return;
         }
@@ -332,8 +345,15 @@ public class XferActivity extends AppCompatActivity {
         show_msg("✅ 👍\n\nCompleted successfully\n\n" + share_url);
         ((TextView)findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
 
-        if (prefs.getBoolean("autoclose", false)) {
-            Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
+        String act = prefs.getString("on_up_ok", "menu");
+        if (!act.equals("menu")) {
+            if (act.equals("copy"))
+                copylink();
+            else if (act.equals("share"))
+                sharelink();
+            else
+                Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
+
             finishAndRemoveTask();
             return;
         }
@@ -359,9 +379,7 @@ public class XferActivity extends AppCompatActivity {
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                ClipData cd = ClipData.newPlainText("copyparty upload", share_url);
-                Toast.makeText(getApplicationContext(), "Link copied", Toast.LENGTH_SHORT).show();
+                copylink();
             }
         });
 
@@ -369,20 +387,30 @@ public class XferActivity extends AppCompatActivity {
         btn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent send = new Intent(Intent.ACTION_SEND);
-                send.setType("text/plain");
-                send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
-                send.putExtra(Intent.EXTRA_TEXT, share_url);
-                //startActivity(Intent.createChooser(send, "Share file link"));
-
-                Intent view = new Intent(Intent.ACTION_VIEW);
-                view.setData(Uri.parse(share_url));
-
-                Intent i = Intent.createChooser(send, "Share file link");
-                i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { view });
-                startActivity(i);
+                sharelink();
             }
         });
+    }
+
+    void copylink() {
+        ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        ClipData cd = ClipData.newPlainText("copyparty upload", share_url);
+        Toast.makeText(getApplicationContext(), "Upload OK -- Link copied", Toast.LENGTH_SHORT).show();
+    }
+
+    void sharelink() {
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
+        send.putExtra(Intent.EXTRA_TEXT, share_url);
+        //startActivity(Intent.createChooser(send, "Share file link"));
+
+        Intent view = new Intent(Intent.ACTION_VIEW);
+        view.setData(Uri.parse(share_url));
+
+        Intent i = Intent.createChooser(send, "Share file link");
+        i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { view });
+        startActivity(i);
     }
 }
