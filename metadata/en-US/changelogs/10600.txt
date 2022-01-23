@@ -1,2 +1,4 @@
+• new: upload multiple files
 • new: choose what happens when an upload succeeds
 • new: add http:// to the server URL if missing
+• bugfix: sharing from some apps in android 10+ could crash this app
