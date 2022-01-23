@@ -3,6 +3,7 @@
     package="me.ocv.partyup">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" /> <!-- required for sharing from certain apps, such as Amaze v3.3.2 -->
 
     <application
         android:allowBackup="true"

@@ -2,19 +2,24 @@ package me.ocv.partyup;
 
 import static java.lang.String.format;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import android.provider.OpenableColumns;
 import android.util.Log;
@@ -34,6 +39,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -84,11 +90,10 @@ public class XferActivity extends AppCompatActivity {
         if (many) {
             ArrayList<Uri> x = the_intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
             handles = x.toArray(new Uri[0]);
-        }
-        else if (one) {
+        } else if (one) {
             Uri uri = (Uri) the_intent.getParcelableExtra(Intent.EXTRA_STREAM);
             if (uri != null)
-                handles = new Uri[]{ uri };
+                handles = new Uri[]{uri};
             else
                 the_msg = the_intent.getStringExtra(Intent.EXTRA_TEXT);
         }
@@ -115,7 +120,7 @@ public class XferActivity extends AppCompatActivity {
             password = "";  // necessary in the emulator, not on real devices(?)
 
         password = password.isEmpty() ? null :
-            "Basic " + new String(Base64.getEncoder().encode(password.getBytes()));
+                "Basic " + new String(Base64.getEncoder().encode(password.getBytes()));
 
         final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(v -> {
@@ -125,12 +130,55 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void show_msg(String txt) {
-        ((TextView)findViewById(R.id.upper_info)).setText(txt);
+        ((TextView) findViewById(R.id.upper_info)).setText(txt);
     }
 
     private void tshow_msg(String txt) {
-        final TextView tv = (TextView)findViewById(R.id.upper_info);
+        final TextView tv = (TextView) findViewById(R.id.upper_info);
         tv.post(() -> tv.setText(txt));
+    }
+
+    void need_storage() {
+        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+        if (!shouldShowRequestPermissionRationale(perm)) {
+            request_storage();
+            return;
+        }
+        AlertDialog.Builder ab = new AlertDialog.Builder(findViewById(R.id.upper_info).getContext());
+        ab.setMessage("PartyUP! needs additional permissions to read that file, because the app you shared it from is using old APIs."
+        ).setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                request_storage();
+            }
+        }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+            }
+        }).show();
+    }
+
+    void request_storage() {
+        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+        requestPermissions(new String[]{perm}, 573);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int permRequestCode, String perms[], int[] grantRes) {
+        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+        if (permRequestCode != 573)
+            return;
+
+        for (int a = 0; a < grantRes.length; a++) {
+            if (!perms[a].equals(perm))
+                continue;
+
+            if (grantRes[a] != PackageManager.PERMISSION_GRANTED)
+                return;
+
+            handleSendImage();
+        }
     }
 
     String getext(String mime) {
@@ -140,10 +188,14 @@ public class XferActivity extends AppCompatActivity {
         mime = mime.replace(';', ' ').split(" ")[0];
 
         switch (mime) {
-            case "audio/ogg": return "ogg";
-            case "audio/mpeg": return "mp3";
-            case "audio/mp4": return "m4a";
-            case "image/jpeg": return "jpg";
+            case "audio/ogg":
+                return "ogg";
+            case "audio/mpeg":
+                return "mp3";
+            case "audio/mp4":
+                return "m4a";
+            case "image/jpeg":
+                return "jpg";
         }
 
         if (mime.startsWith("text/"))
@@ -167,28 +219,32 @@ public class XferActivity extends AppCompatActivity {
     @SuppressLint("DefaultLocale")
     private void handleSendImage() {
         for (F f : files) {
-            // contentresolver returns the wrong filesize (off by 626 bytes)
-            // but we want the name so lets go
-            try {
-                Cursor cur = getContentResolver().query(f.handle, null, null, null, null);
-                assert cur != null;
-                int iname = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                int isize = cur.getColumnIndex(OpenableColumns.SIZE);
-                cur.moveToFirst();
-                f.name = cur.getString(iname);
-                f.size = cur.getLong(isize);
-                cur.close();
-            }
-            catch (Exception ex) {
-                Log.w("me.ocv.partyup", "contentresolver: " + ex.toString());
+            Log.d("me.ocv.partyup", format("handle [%s]", f.handle));
+            if (f.handle.toString().startsWith("file:///")) {
+                f.name = Paths.get(f.handle.getPath()).getFileName().toString();
+            } else {
+                // contentresolver returns the wrong filesize (off by 626 bytes)
+                // but we want the name so lets go
+                try {
+                    Cursor cur = getContentResolver().query(f.handle, null, null, null, null);
+                    assert cur != null;
+                    int iname = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    int isize = cur.getColumnIndex(OpenableColumns.SIZE);
+                    cur.moveToFirst();
+                    f.name = cur.getString(iname);
+                    f.size = cur.getLong(isize);
+                    cur.close();
+                } catch (Exception ex) {
+                    Log.w("me.ocv.partyup", "contentresolver: " + ex.toString());
+                }
             }
 
             MessageDigest md = null;
             if (f.name == null) {
                 try {
                     md = MessageDigest.getInstance("SHA-512");
+                } catch (Exception ex) {
                 }
-                catch (Exception ex) { }
             }
 
             // get correct filesize
@@ -209,6 +265,10 @@ public class XferActivity extends AppCompatActivity {
                 f.size = sz;
             } catch (Exception ex) {
                 show_msg("Error3: " + ex.toString());
+                if (this.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    need_storage();
+                    return;
+                }
                 return;
             }
 
@@ -225,18 +285,17 @@ public class XferActivity extends AppCompatActivity {
         if (files.length == 1) {
             msg = "Upload the following file?\n\n" + files[0].desc;
             bytes_total = files[0].size;
-        }
-        else {
+        } else {
             msg = "Upload the following " + files.length + " files?\n\n";
             for (int a = 0; a < Math.min(10, files.length); a++) {
-                msg += files[a].name + "\n";
+                msg += "  ► " + files[a].name + "\n";
                 bytes_total += files[a].size;
             }
 
             if (files.length > 10)
                 msg += "[...]\n";
 
-            msg += format("--- total %,d bytes ---", bytes_total);
+            msg += format("\n(total %,d bytes)", bytes_total);
         }
         show_msg(msg);
         if (prefs.getBoolean("autosend", false))
@@ -284,13 +343,11 @@ public class XferActivity extends AppCompatActivity {
 
                 if (files == null)
                     do_textmsg(conn);
-                else
-                    if (!do_fileput(conn, a))
-                        return;
+                else if (!do_fileput(conn, a))
+                    return;
             }
             findViewById(R.id.upper_info).post(() -> onsuccess());
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             tshow_msg("Error2: " + ex.toString() + "\n\nmaybe wrong password?");
         }
     }
@@ -350,7 +407,7 @@ public class XferActivity extends AppCompatActivity {
                 double perc = ((double) bytes_done * 1000) / bytes_total;
                 long td = 1 + System.currentTimeMillis() - t0;
                 double spd = bytes_done / (td / 1000.0);
-                long left = (long)((bytes_total - bytes_done) / spd);
+                long left = (long) ((bytes_total - bytes_done) / spd);
                 tv.setText(format("Sending to %s ...\n\nFile %d of %d:\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nspeed:  %.2f MiB/s\nprogress:  %.2f %%\nETA:  %d sec",
                         base_url,
                         nfile + 1,
@@ -406,7 +463,7 @@ public class XferActivity extends AppCompatActivity {
                 msg += "\n\n" + files.length + " files OK";
         }
         show_msg(msg);
-        ((TextView)findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
+        ((TextView) findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
 
         String act = prefs.getString("on_up_ok", "menu");
         if (act != null && !act.equals("menu")) {
@@ -424,11 +481,11 @@ public class XferActivity extends AppCompatActivity {
         findViewById(R.id.progbar).setVisibility(View.GONE);
         findViewById(R.id.successbuttons).setVisibility(View.VISIBLE);
 
-        Button btn = (Button)findViewById(R.id.btnExit);
+        Button btn = (Button) findViewById(R.id.btnExit);
         btn.setOnClickListener(v -> finishAndRemoveTask());
 
-        Button vcopy = (Button)findViewById(R.id.btnCopyLink);
-        Button vshare = (Button)findViewById(R.id.btnShareLink);
+        Button vcopy = (Button) findViewById(R.id.btnCopyLink);
+        Button vshare = (Button) findViewById(R.id.btnShareLink);
         if (files == null) {
             vcopy.setVisibility(View.GONE);
             vshare.setVisibility(View.GONE);
@@ -470,7 +527,7 @@ public class XferActivity extends AppCompatActivity {
         view.setData(Uri.parse(f.share_url));
 
         Intent i = Intent.createChooser(send, "Share file link");
-        i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { view });
+        i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{view});
         startActivity(i);
     }
 }

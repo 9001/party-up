@@ -3,3 +3,4 @@
 • new: choose what happens when upload succeeds
 • new: add http:// to the server URL if missing
 • bugfix: sharing from some apps on android 10+ could crash this app
+• bugfix: ask for READ_EXTERNAL_STORAGE if necessary (when sharing files from certain apps, such as Amaze v3.3.2)
