@@ -109,6 +109,14 @@ public class XferActivity extends AppCompatActivity {
             return;
         }
 
+        password = prefs.getString("server_password", "");
+        password = password == null ? "" : password;
+        if (password.equals("Default value"))
+            password = "";  // necessary in the emulator, not on real devices(?)
+
+        password = password.isEmpty() ? null :
+            "Basic " + new String(Base64.getEncoder().encode(password.getBytes()));
+
         final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(v -> {
             fab.setVisibility(View.GONE);
@@ -175,8 +183,13 @@ public class XferActivity extends AppCompatActivity {
                 Log.w("me.ocv.partyup", "contentresolver: " + ex.toString());
             }
 
-            if (f.name == null)
-                f.name = "mystery-file." + getext(the_intent.getType());
+            MessageDigest md = null;
+            if (f.name == null) {
+                try {
+                    md = MessageDigest.getInstance("SHA-512");
+                }
+                catch (Exception ex) { }
+            }
 
             // get correct filesize
             try {
@@ -190,6 +203,8 @@ public class XferActivity extends AppCompatActivity {
                         break;
 
                     sz += n;
+                    if (md != null)
+                        md.update(buf, 0, n);
                 }
                 f.size = sz;
             } catch (Exception ex) {
@@ -197,15 +212,21 @@ public class XferActivity extends AppCompatActivity {
                 return;
             }
 
+            if (md != null) {
+                String csum = new String(Base64.getUrlEncoder().encode(md.digest())).substring(0, 15);
+                f.name = format("mystery-file-%s.%s", csum, getext(the_intent.getType()));
+            }
+
             f.desc = format("%s\n\nsize: %,d byte\ntype: %s", f.name, f.size, the_intent.getType());
         }
 
         String msg;
+        bytes_done = bytes_total = 0;
         if (files.length == 1) {
             msg = "Upload the following file?\n\n" + files[0].desc;
+            bytes_total = files[0].size;
         }
         else {
-            bytes_done = bytes_total = 0;
             msg = "Upload the following " + files.length + " files?\n\n";
             for (int a = 0; a < Math.min(10, files.length); a++) {
                 msg += files[a].name + "\n";
@@ -242,11 +263,6 @@ public class XferActivity extends AppCompatActivity {
             if (!base_url.endsWith("/"))
                 base_url += "/";
 
-            password = prefs.getString("server_password", "");
-            password = password == null ? "" : password;
-            if (password.equals("Default value"))
-                password = "";  // necessary in the emulator, not on real devices(?)
-
             tshow_msg("Sending to " + base_url + " ...");
 
             int nfiles = files == null ? 1 : files.length;
@@ -262,8 +278,8 @@ public class XferActivity extends AppCompatActivity {
                 URL url = new URL(full_url);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setDoOutput(true);
-                if (!password.isEmpty())
-                    conn.setRequestProperty("Authorization", "Basic " + new String(Base64.getEncoder().encode(password.getBytes())));
+                if (password != null)
+                    conn.setRequestProperty("Authorization", password);
 
                 if (files == null)
                     do_textmsg(conn);
@@ -314,6 +330,7 @@ public class XferActivity extends AppCompatActivity {
         conn.setRequestProperty("Content-Type", "application/octet-stream");
         conn.connect();
         final TextView tv = (TextView) findViewById(R.id.upper_info);
+        final ProgressBar pb = (ProgressBar) findViewById(R.id.progbar);
         OutputStream os = conn.getOutputStream();
         InputStream ins = getContentResolver().openInputStream(f.handle);
         MessageDigest md = MessageDigest.getInstance("SHA-512");
@@ -329,7 +346,7 @@ public class XferActivity extends AppCompatActivity {
             md.update(buf, 0, n);
 
             tv.post(() -> {
-                double perc = ((double) bytes_done * 100) / bytes_total;
+                double perc = ((double) bytes_done * 1000) / bytes_total;
                 tv.setText(format("Sending %d of %d to %s ...\n\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nprogress:  %.2f %%",
                         nfile + 1,
                         files.length,
@@ -337,9 +354,9 @@ public class XferActivity extends AppCompatActivity {
                         f.desc,
                         bytes_done,
                         bytes_total - bytes_done,
-                        perc
+                        perc / 10
                 ));
-                ((ProgressBar) findViewById(R.id.progbar)).setProgress((int) Math.round(perc));
+                pb.setProgress((int) Math.round(perc));
             });
         }
         os.flush();
