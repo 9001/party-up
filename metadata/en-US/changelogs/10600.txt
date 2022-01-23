@@ -1,4 +1,5 @@
 • new: upload multiple files
+• new: show transfer speed and ETA
 • new: choose what happens when upload succeeds
 • new: add http:// to the server URL if missing
 • bugfix: sharing from some apps on android 10+ could crash this app

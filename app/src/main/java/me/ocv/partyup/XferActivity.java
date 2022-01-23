@@ -57,7 +57,7 @@ public class XferActivity extends AppCompatActivity {
     String base_url;
     boolean upping;
     String the_msg;
-    long bytes_done, bytes_total;
+    long bytes_done, bytes_total, t0;
     F[] files;
 
     @Override
@@ -263,6 +263,7 @@ public class XferActivity extends AppCompatActivity {
             if (!base_url.endsWith("/"))
                 base_url += "/";
 
+            t0 = System.currentTimeMillis();
             tshow_msg("Sending to " + base_url + " ...");
 
             int nfiles = files == null ? 1 : files.length;
@@ -347,14 +348,19 @@ public class XferActivity extends AppCompatActivity {
 
             tv.post(() -> {
                 double perc = ((double) bytes_done * 1000) / bytes_total;
-                tv.setText(format("Sending %d of %d to %s ...\n\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nprogress:  %.2f %%",
+                long td = 1 + System.currentTimeMillis() - t0;
+                double spd = bytes_done / (td / 1000.0);
+                long left = (long)((bytes_total - bytes_done) / spd);
+                tv.setText(format("Sending to %s ...\n\nFile %d of %d:\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nspeed:  %.2f MiB/s\nprogress:  %.2f %%\nETA:  %d sec",
+                        base_url,
                         nfile + 1,
                         files.length,
-                        base_url,
                         f.desc,
                         bytes_done,
                         bytes_total - bytes_done,
-                        perc / 10
+                        spd / 1024 / 1024,
+                        perc / 10,
+                        left
                 ));
                 pb.setProgress((int) Math.round(perc));
             });
