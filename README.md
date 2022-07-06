@@ -27,7 +27,7 @@ setup a raspberry pi (raspbian or something else with a desktop) with the [very-
 sudo apt install xdotool wmctrl libnotify-bin
 curl -LO https://github.com/9001/copyparty/releases/latest/download/copyparty-sfx.py
 curl -LO https://raw.githubusercontent.com/9001/copyparty/hovudstraum/bin/mtag/very-bad-idea.py
-python3 copyparty-sfx.py --urlform save,get -v.::rw:c,e2d,e2t,mte=+a1:c,mtp=a1=ad,very-bad-idea.py
+python3 copyparty-sfx.py --urlform save,get -v.::rw:c,e2d,e2t,mte=+a1:c,mtp=a1=ad,t3,kn,very-bad-idea.py
 ```
 
 now, every time someone uploads something, it'll appear on the screen
