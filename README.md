@@ -27,8 +27,11 @@ setup a raspberry pi (raspbian or something else with a desktop) with the [very-
 sudo apt install xdotool wmctrl libnotify-bin
 curl -LO https://github.com/9001/copyparty/releases/latest/download/copyparty-sfx.py
 curl -LO https://raw.githubusercontent.com/9001/copyparty/hovudstraum/bin/mtag/very-bad-idea.py
-python3 copyparty-sfx.py --urlform save,get -v.::rw:c,e2d,e2t,mte=+a1:c,mtp=a1=ad,t3,kn,very-bad-idea.py
+python3 copyparty-sfx.py --urlform save,get -a kevin:hunter2 -v.::rw,kevin:c,e2d,e2t,mte=+a1:c,mtp=a1=ad,t3,kn,very-bad-idea.py
 ```
+
+**WARNING:** by design, the `very-bad-idea` plugin makes it possible for anyone (with upload access) to hijack the copyparty server... so keep this on a LAN with people you trust, and give it a good password!
+* and replace the example password `hunter2` for the example account `kevin` as appropriate
 
 now, every time someone uploads something, it'll appear on the screen
 * there is no queue system, it just goes
