@@ -19,7 +19,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import android.provider.OpenableColumns;
 import android.util.Log;
@@ -41,6 +40,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 
@@ -317,6 +320,14 @@ public class XferActivity extends AppCompatActivity {
 
             if (!base_url.endsWith("/"))
                 base_url += "/";
+
+            if (base_url.contains("%")) {
+                String[] dtc = "%Y %q %m %d %j %H %M %S".split(" ");
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy Q MM dd DDD HH mm ss");
+                String[] dtp = dtf.withZone(ZoneId.from(ZoneOffset.UTC)).format(Instant.now()).split(" ");
+                for (int a = 0; a < dtc.length; a++)
+                    base_url = base_url.replace(dtc[a], dtp[a]);
+            }
 
             t0 = System.currentTimeMillis();
             tshow_msg("Sending to " + base_url + " ...");
