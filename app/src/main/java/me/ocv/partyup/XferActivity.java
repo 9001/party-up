@@ -115,12 +115,8 @@ public class XferActivity extends AppCompatActivity {
         }
 
         password = prefs.getString("server_password", "");
-        password = password == null ? "" : password;
-        if (password.equals("Default value"))
-            password = "";  // necessary in the emulator, not on real devices(?)
-
-        password = password.isEmpty() ? null :
-                "Basic " + new String(Base64.getEncoder().encode(password.getBytes()));
+        if (password == null || password.isEmpty() || password.equals("Default value"))
+            password = null;
 
         final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(v -> {
@@ -339,7 +335,7 @@ public class XferActivity extends AppCompatActivity {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setDoOutput(true);
                 if (password != null)
-                    conn.setRequestProperty("Authorization", password);
+                    conn.setRequestProperty("PW", password);
 
                 if (files == null)
                     do_textmsg(conn);
