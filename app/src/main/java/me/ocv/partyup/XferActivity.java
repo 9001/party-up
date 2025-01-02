@@ -13,6 +13,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -137,8 +138,14 @@ public class XferActivity extends AppCompatActivity {
         tv.post(() -> tv.setText(txt));
     }
 
-    void need_storage() {
+    void need_storage(String exmsg) {
+        if (Build.VERSION.SDK_INT > 29 && exmsg.contains("EACCES"))
+            show_msg(exmsg + "\n\nYou must update the app you shared the file from; it is using a dead/forbidden API for sharing files, and Android is preventing new versions of PartyUP! from using this API. Older versions of PartyUP! such as 1.6.0 may work.");
+
         String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+        if (this.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED)
+            return;  // already have it, so that's not why it failed
+
         if (!shouldShowRequestPermissionRationale(perm)) {
             request_storage();
             return;
@@ -263,11 +270,9 @@ public class XferActivity extends AppCompatActivity {
                 }
                 f.size = sz;
             } catch (Exception ex) {
-                show_msg("Error3: " + ex.toString());
-                if (this.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                    need_storage();
-                    return;
-                }
+                String exmsg = "Error3: " + ex.toString();
+                show_msg(exmsg);
+                need_storage(exmsg);
                 return;
             }
 

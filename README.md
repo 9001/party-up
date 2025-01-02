@@ -19,6 +19,15 @@ only the PUT API is implemented for now so there is no resumable uploads yet
 now all share buttons in other apps/browsers will have "Party UP!" as an option, letting you upload pics / vids / twitter links / anything really
 
 
+## in case of permission errors
+
+as of Android 11 (SDK30), a new API for sharing files was unfortunately enforced
+
+if you get `Error3: java.io.FileNotFoundException` then that's because you are sharing files from an app which is still using the old API, which has now become forbidden for new apps to use
+
+if you really need to share files from such outdated apps, then you'll have to use PartyUP 1.6.0 or older -- these versions were compiled for Android 9 (SDK28) which gives them permission to use the old API
+
+
 ## the full experience
 
 setup a raspberry pi (raspbian or something else with a desktop) with the [very-bad-idea](https://github.com/9001/copyparty/blob/hovudstraum/bin/mtag/very-bad-idea.py) plugin:
