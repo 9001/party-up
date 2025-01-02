@@ -1,0 +1,3 @@
+• new: expand strftime in server-url; %Y %m %d %H %M %S %q %j
+• new: replace basic-auth with PW header
+• new: target api-level 34, support api-level 28+
