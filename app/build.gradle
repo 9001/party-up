@@ -3,6 +3,8 @@ plugins {
 }
 
 android {
+    namespace "me.ocv.partyup"
+
     signingConfigs {
         release {
             storeFile file('/home/ed/.android/debug.keystore')
@@ -11,19 +13,19 @@ android {
             keyPassword 'android'
         }
     }
-    compileSdk 28
+    compileSdk 34
 
     defaultConfig {
         applicationId "me.ocv.partyup"
         minSdk 28
-        targetSdk 28
+        targetSdk 34
         versionCode 10600
         versionName "1.6.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         signingConfig signingConfigs.release
         minSdkVersion 28
-        targetSdkVersion 28
+        targetSdkVersion 34
     }
 
     buildTypes {
@@ -38,22 +40,21 @@ android {
     }
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
-    compileSdkVersion 28
+    lint {
+        checkReleaseBuilds false
+    }
 
     // "Lint found fatal errors while assembling a release target:"
     // "Google Play requires that apps target API level 29 or higher"
     // lol how about no
-    lintOptions {
-        checkReleaseBuilds false
-        //abortOnError false
-    }
 }
 
 dependencies {
-    implementation 'com.google.android.material:material:1.4.0'
-    implementation 'androidx.preference:preference:1.1.1'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.preference:preference:1.2.1'
     testImplementation 'junit:junit:4.+'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
 }
