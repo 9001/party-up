@@ -12,4 +12,20 @@
         <item>Share file link</item>
         <item>Exit app</item>
     </string-array>
+    <string-array name="share_exp_values">
+        <item></item>
+        <item>60</item>
+        <item>360</item>
+        <item>1440</item>
+        <item>10080</item>
+        <item>43200</item>
+    </string-array>
+    <string-array name="share_exp_labels">
+        <item>Never expires</item>
+        <item>1 hour</item>
+        <item>6 hours</item>
+        <item>1 day</item>
+        <item>1 week</item>
+        <item>30 days</item>
+    </string-array>
 </resources>

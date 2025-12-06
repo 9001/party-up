@@ -26,17 +26,28 @@
             android:key="autosend"
             android:title="Just go"
             app:summary="Skip confirmation screen" />
-        <SwitchPreference
-            android:defaultValue="false"
-            android:key="use_share_url"
-            android:title="Use share link"
-            app:summary="Copy share link instead of direct file URL" />
         <ListPreference
             android:defaultValue="close"
             android:entries="@array/vonsuccess"
             android:entryValues="@array/konsuccess"
             android:key="on_up_ok"
             android:title="On upload success..."
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="Share links">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="use_share_url"
+            android:title="Use share link"
+            app:summary="Create a share link instead of using direct file URL" />
+        <ListPreference
+            android:defaultValue=""
+            android:entries="@array/share_exp_labels"
+            android:entryValues="@array/share_exp_values"
+            android:key="share_expiration"
+            android:title="Link expiration"
+            android:dependency="use_share_url"
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 

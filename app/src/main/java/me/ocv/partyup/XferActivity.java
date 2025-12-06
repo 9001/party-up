@@ -217,8 +217,25 @@ public class XferActivity extends AppCompatActivity {
         return "bin";
     }
 
+    String getExpirationLabel() {
+        String exp = prefs.getString("share_expiration", "");
+        if (exp == null || exp.isEmpty())
+            return "never expires";
+
+        int minutes = Integer.parseInt(exp);
+        if (minutes < 60)
+            return minutes + " min";
+        if (minutes < 1440)
+            return (minutes / 60) + " hour" + (minutes >= 120 ? "s" : "");
+        int days = minutes / 1440;
+        return days + " day" + (days > 1 ? "s" : "");
+    }
+
     private void handleSendText() {
-        show_msg("Post the following link?\n\n" + the_msg);
+        String msg = "Post the following link?\n\n" + the_msg;
+        if (prefs.getBoolean("use_share_url", false))
+            msg += "\n\n📤 Share link: " + getExpirationLabel();
+        show_msg(msg);
         if (prefs.getBoolean("autosend", false))
             do_up();
     }
@@ -301,6 +318,9 @@ public class XferActivity extends AppCompatActivity {
                 msg += "[...]\n";
 
             msg += format("\n(total %,d bytes)", bytes_total);
+        }
+        if (prefs.getBoolean("use_share_url", false)) {
+            msg += "\n\n📤 Share link: " + getExpirationLabel();
         }
         show_msg(msg);
         if (prefs.getBoolean("autosend", false))
@@ -490,9 +510,12 @@ public class XferActivity extends AppCompatActivity {
                 shareApiUrl += ":" + url.getPort();
             shareApiUrl += "/?share";
 
+            // Get expiration preference (seconds as string)
+            String expiration = prefs.getString("share_expiration", "");
+
             // Build JSON body
-            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"\",\"exp\":\"\",\"perms\":[\"read\"]}",
-                    key.toString(), filePath);
+            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+                    key.toString(), filePath, expiration);
 
             URL apiUrl = new URL(shareApiUrl);
             HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
