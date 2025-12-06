@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
 
@@ -458,12 +459,75 @@ public class XferActivity extends AppCompatActivity {
             tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server");
             return false;
         }
+
         if (lines.length > 3 && !lines[3].isEmpty())
             f.share_url = lines[3];
         else
             f.share_url = f.full_url.split("\\?")[0];
 
+        if (prefs.getBoolean("use_share_url", false))
+            createShareUrl(f);
+
         return true;
+    }
+
+    void createShareUrl(F f) {
+        try {
+            // Generate random key
+            String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+            SecureRandom random = new SecureRandom();
+            StringBuilder key = new StringBuilder();
+            for (int i = 0; i < 12; i++)
+                key.append(chars.charAt(random.nextInt(chars.length())));
+
+            // Extract file path from URL
+            URL url = new URL(f.full_url);
+            String filePath = url.getPath();
+
+            // Build share API URL (base URL without file path)
+            String shareApiUrl = url.getProtocol() + "://" + url.getHost();
+            if (url.getPort() != -1)
+                shareApiUrl += ":" + url.getPort();
+            shareApiUrl += "/?share";
+
+            // Build JSON body
+            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"\",\"exp\":\"\",\"perms\":[\"read\"]}",
+                    key.toString(), filePath);
+
+            URL apiUrl = new URL(shareApiUrl);
+            HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "text/plain");
+            if (password != null)
+                conn.setRequestProperty("PW", password);
+
+            byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
+            conn.setFixedLengthStreamingMode(body.length);
+            conn.connect();
+
+            OutputStream os = conn.getOutputStream();
+            os.write(body);
+            os.flush();
+
+            int rc = conn.getResponseCode();
+            if (rc >= 300) {
+                Log.w("me.ocv.partyup", "Share creation failed: " + rc);
+                conn.disconnect();
+                return;
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            String response = br.readLine();
+            conn.disconnect();
+
+            // Parse response: "created share: https://..."
+            if (response != null && response.startsWith("created share: "))
+                f.share_url = response.substring(15);
+
+        } catch (Exception ex) {
+            Log.w("me.ocv.partyup", "Share creation error: " + ex.toString());
+        }
     }
 
     void onsuccess() {

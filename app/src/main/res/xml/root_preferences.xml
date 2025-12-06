@@ -26,6 +26,11 @@
             android:key="autosend"
             android:title="Just go"
             app:summary="Skip confirmation screen" />
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="use_share_url"
+            android:title="Use share link"
+            app:summary="Copy share link instead of direct file URL" />
         <ListPreference
             android:defaultValue="close"
             android:entries="@array/vonsuccess"
