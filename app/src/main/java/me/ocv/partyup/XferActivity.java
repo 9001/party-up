@@ -274,8 +274,7 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void handleSendText() {
-        String msg = "Post the following link?\n\n" + the_msg;
-        show_msg(msg);
+        show_msg("Post the following link?\n\n" + the_msg);
         showShareSettings();
         if (prefs.getBoolean("autosend", false))
             do_up();
@@ -564,7 +563,7 @@ public class XferActivity extends AppCompatActivity {
                 shareApiUrl += ":" + url.getPort();
             shareApiUrl += "/?share";
 
-            // Get expiration from UI field
+            // Get expiration
             EditText expField = findViewById(R.id.share_expiration);
             String expValue = expField.getText().toString();
             int[] parsed = parseExpiration(expValue);
@@ -576,7 +575,7 @@ public class XferActivity extends AppCompatActivity {
                 expiration = String.valueOf(minutes);
             }
 
-            // Get password from UI field
+            // Get password
             EditText pwField = findViewById(R.id.share_password);
             String sharePw = pwField.getText().toString();
 
