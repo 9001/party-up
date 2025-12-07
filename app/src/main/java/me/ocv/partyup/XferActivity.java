@@ -500,9 +500,9 @@ public class XferActivity extends AppCompatActivity {
             for (int i = 0; i < 12; i++)
                 key.append(chars.charAt(random.nextInt(chars.length())));
 
-            // Extract file path from URL
+            // Extract file path from URL and decode it
             URL url = new URL(f.full_url);
-            String filePath = url.getPath();
+            String filePath = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
 
             // Build share API URL (base URL without file path)
             String shareApiUrl = url.getProtocol() + "://" + url.getHost();
