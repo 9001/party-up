@@ -41,14 +41,11 @@
             android:key="use_share_url"
             android:title="Use share link"
             app:summary="Create a share link instead of using direct file URL" />
-        <ListPreference
+        <EditTextPreference
             android:defaultValue=""
-            android:entries="@array/share_exp_labels"
-            android:entryValues="@array/share_exp_values"
-            android:key="share_expiration"
+            android:key="link_expiration"
             android:title="Link expiration"
-            android:dependency="use_share_url"
-            app:useSimpleSummaryProvider="true" />
+            android:dependency="use_share_url" />
     </PreferenceCategory>
 
 </PreferenceScreen>

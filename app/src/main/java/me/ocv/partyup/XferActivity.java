@@ -217,18 +217,59 @@ public class XferActivity extends AppCompatActivity {
         return "bin";
     }
 
+    int[] parseExpiration(String value) {
+        // Returns [number, unit] where unit: 0=minutes, 1=hours, 2=days, -1=invalid/empty
+        if (value == null || value.trim().isEmpty())
+            return new int[]{0, -1};
+
+        value = value.trim().toLowerCase();
+        if (!value.matches("^\\d+[mhd]?$"))
+            return new int[]{0, -1};
+
+        char unit = value.charAt(value.length() - 1);
+        int num;
+        int unitType;
+
+        if (Character.isDigit(unit)) {
+            num = Integer.parseInt(value);
+            unitType = 0; // minutes
+        } else {
+            num = Integer.parseInt(value.substring(0, value.length() - 1));
+            switch (unit) {
+                case 'h': unitType = 1; break;
+                case 'd': unitType = 2; break;
+                default: unitType = 0; break;
+            }
+        }
+        return new int[]{num, unitType};
+    }
+
+    String getExpirationMinutes() {
+        String value = prefs.getString("link_expiration", "");
+        int[] parsed = parseExpiration(value);
+        if (parsed[1] < 0)
+            return "";
+
+        int minutes = parsed[0];
+        if (parsed[1] == 1) minutes *= 60;       // hours
+        else if (parsed[1] == 2) minutes *= 1440; // days
+
+        return String.valueOf(minutes);
+    }
+
     String getExpirationLabel() {
-        String exp = prefs.getString("share_expiration", "");
-        if (exp == null || exp.isEmpty())
+        String value = prefs.getString("link_expiration", "");
+        int[] parsed = parseExpiration(value);
+        if (parsed[1] < 0)
             return "never expires";
 
-        int minutes = Integer.parseInt(exp);
-        if (minutes < 60)
-            return minutes + " min";
-        if (minutes < 1440)
-            return (minutes / 60) + " hour" + (minutes >= 120 ? "s" : "");
-        int days = minutes / 1440;
-        return days + " day" + (days > 1 ? "s" : "");
+        int num = parsed[0];
+        switch (parsed[1]) {
+            case 0: return num + " minute" + (num != 1 ? "s" : "");
+            case 1: return num + " hour" + (num != 1 ? "s" : "");
+            case 2: return num + " day" + (num != 1 ? "s" : "");
+            default: return "never expires";
+        }
     }
 
     private void handleSendText() {
@@ -510,8 +551,8 @@ public class XferActivity extends AppCompatActivity {
                 shareApiUrl += ":" + url.getPort();
             shareApiUrl += "/?share";
 
-            // Get expiration preference (seconds as string)
-            String expiration = prefs.getString("share_expiration", "");
+            // Get expiration in minutes
+            String expiration = getExpirationMinutes();
 
             // Build JSON body
             String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
