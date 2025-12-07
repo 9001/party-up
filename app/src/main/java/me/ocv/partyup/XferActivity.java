@@ -554,9 +554,13 @@ public class XferActivity extends AppCompatActivity {
             // Get expiration in minutes
             String expiration = getExpirationMinutes();
 
+            // Get share password
+            String sharePw = prefs.getString("share_password", "");
+            if (sharePw == null) sharePw = "";
+
             // Build JSON body
-            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
-                    key.toString(), filePath, expiration);
+            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+                    key.toString(), filePath, sharePw, expiration);
 
             URL apiUrl = new URL(shareApiUrl);
             HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
