@@ -26,6 +26,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.preference.PreferenceManager;
@@ -274,11 +275,25 @@ public class XferActivity extends AppCompatActivity {
 
     private void handleSendText() {
         String msg = "Post the following link?\n\n" + the_msg;
-        if (prefs.getBoolean("use_share_url", false))
-            msg += "\n\n📤 Share link: " + getExpirationLabel();
         show_msg(msg);
+        showShareSettings();
         if (prefs.getBoolean("autosend", false))
             do_up();
+    }
+
+    private void showShareSettings() {
+        if (prefs.getBoolean("use_share_url", false)) {
+            findViewById(R.id.share_settings).setVisibility(View.VISIBLE);
+
+            EditText expField = findViewById(R.id.share_expiration);
+            EditText pwField = findViewById(R.id.share_password);
+
+            String defaultExp = prefs.getString("link_expiration", "");
+            String defaultPw = prefs.getString("share_password", "");
+
+            expField.setText(defaultExp != null ? defaultExp : "");
+            pwField.setText(defaultPw != null ? defaultPw : "");
+        }
     }
 
     @SuppressLint("DefaultLocale")
@@ -360,10 +375,8 @@ public class XferActivity extends AppCompatActivity {
 
             msg += format("\n(total %,d bytes)", bytes_total);
         }
-        if (prefs.getBoolean("use_share_url", false)) {
-            msg += "\n\n📤 Share link: " + getExpirationLabel();
-        }
         show_msg(msg);
+        showShareSettings();
         if (prefs.getBoolean("autosend", false))
             do_up();
     }
@@ -551,12 +564,21 @@ public class XferActivity extends AppCompatActivity {
                 shareApiUrl += ":" + url.getPort();
             shareApiUrl += "/?share";
 
-            // Get expiration in minutes
-            String expiration = getExpirationMinutes();
+            // Get expiration from UI field
+            EditText expField = findViewById(R.id.share_expiration);
+            String expValue = expField.getText().toString();
+            int[] parsed = parseExpiration(expValue);
+            String expiration = "";
+            if (parsed[1] >= 0) {
+                int minutes = parsed[0];
+                if (parsed[1] == 1) minutes *= 60;
+                else if (parsed[1] == 2) minutes *= 1440;
+                expiration = String.valueOf(minutes);
+            }
 
-            // Get share password
-            String sharePw = prefs.getString("share_password", "");
-            if (sharePw == null) sharePw = "";
+            // Get password from UI field
+            EditText pwField = findViewById(R.id.share_password);
+            String sharePw = pwField.getText().toString();
 
             // Build JSON body
             String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
@@ -623,6 +645,7 @@ public class XferActivity extends AppCompatActivity {
         }
 
         findViewById(R.id.progbar).setVisibility(View.GONE);
+        findViewById(R.id.share_settings).setVisibility(View.GONE);
         findViewById(R.id.successbuttons).setVisibility(View.VISIBLE);
 
         Button btn = (Button) findViewById(R.id.btnExit);

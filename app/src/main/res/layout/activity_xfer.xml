@@ -63,6 +63,62 @@
                 android:layout_weight="1" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/share_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="24dp"
+            android:paddingTop="16dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Expires:"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/share_expiration"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:hint="e.g. 30m, 2h, 7d"
+                    android:inputType="text"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Password:"
+                    android:textSize="14sp" />
+
+                <EditText
+                    android:id="@+id/share_password"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:hint="optional"
+                    android:inputType="text"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <Space
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
