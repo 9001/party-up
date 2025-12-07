@@ -76,7 +76,7 @@ public class SettingsActivity extends AppCompatActivity {
 
         private String getExpSummaryText(String value) {
             if (value == null || value.trim().isEmpty())
-                return "Never expires (e.g. 30m, 2h, 7d)";
+                return "Never expires";
 
             value = value.trim().toLowerCase();
             if (!value.matches("^\\d+[mhd]?$"))
