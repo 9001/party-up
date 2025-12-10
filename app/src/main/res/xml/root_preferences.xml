@@ -35,4 +35,23 @@
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="Share links">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="use_share_url"
+            android:title="Use share link"
+            app:summary="Create a (temporary) share link" />
+        <EditTextPreference
+            android:defaultValue=""
+            android:key="link_expiration"
+            android:title="Default expiration (e.g., 10m, 2h, 1d)"
+            android:dependency="use_share_url" />
+        <EditTextPreference
+            android:defaultValue=""
+            android:key="share_password"
+            android:title="Default password"
+            android:dependency="use_share_url"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

@@ -26,6 +26,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.preference.PreferenceManager;
@@ -45,6 +46,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Base64;
 
@@ -216,10 +218,81 @@ public class XferActivity extends AppCompatActivity {
         return "bin";
     }
 
+    int[] parseExpiration(String value) {
+        // Returns [number, unit] where unit: 0=minutes, 1=hours, 2=days, -1=invalid/empty
+        if (value == null || value.trim().isEmpty())
+            return new int[]{0, -1};
+
+        value = value.trim().toLowerCase();
+        if (!value.matches("^\\d+[mhd]?$"))
+            return new int[]{0, -1};
+
+        char unit = value.charAt(value.length() - 1);
+        int num;
+        int unitType;
+
+        if (Character.isDigit(unit)) {
+            num = Integer.parseInt(value);
+            unitType = 0; // minutes
+        } else {
+            num = Integer.parseInt(value.substring(0, value.length() - 1));
+            switch (unit) {
+                case 'h': unitType = 1; break;
+                case 'd': unitType = 2; break;
+                default: unitType = 0; break;
+            }
+        }
+        return new int[]{num, unitType};
+    }
+
+    String getExpirationMinutes() {
+        String value = prefs.getString("link_expiration", "");
+        int[] parsed = parseExpiration(value);
+        if (parsed[1] < 0)
+            return "";
+
+        int minutes = parsed[0];
+        if (parsed[1] == 1) minutes *= 60;       // hours
+        else if (parsed[1] == 2) minutes *= 1440; // days
+
+        return String.valueOf(minutes);
+    }
+
+    String getExpirationLabel() {
+        String value = prefs.getString("link_expiration", "");
+        int[] parsed = parseExpiration(value);
+        if (parsed[1] < 0)
+            return "never expires";
+
+        int num = parsed[0];
+        switch (parsed[1]) {
+            case 0: return num + " minute" + (num != 1 ? "s" : "");
+            case 1: return num + " hour" + (num != 1 ? "s" : "");
+            case 2: return num + " day" + (num != 1 ? "s" : "");
+            default: return "never expires";
+        }
+    }
+
     private void handleSendText() {
         show_msg("Post the following link?\n\n" + the_msg);
+        showShareSettings();
         if (prefs.getBoolean("autosend", false))
             do_up();
+    }
+
+    private void showShareSettings() {
+        if (prefs.getBoolean("use_share_url", false)) {
+            findViewById(R.id.share_settings).setVisibility(View.VISIBLE);
+
+            EditText expField = findViewById(R.id.share_expiration);
+            EditText pwField = findViewById(R.id.share_password);
+
+            String defaultExp = prefs.getString("link_expiration", "");
+            String defaultPw = prefs.getString("share_password", "");
+
+            expField.setText(defaultExp != null ? defaultExp : "");
+            pwField.setText(defaultPw != null ? defaultPw : "");
+        }
     }
 
     @SuppressLint("DefaultLocale")
@@ -302,6 +375,7 @@ public class XferActivity extends AppCompatActivity {
             msg += format("\n(total %,d bytes)", bytes_total);
         }
         show_msg(msg);
+        showShareSettings();
         if (prefs.getBoolean("autosend", false))
             do_up();
     }
@@ -458,12 +532,91 @@ public class XferActivity extends AppCompatActivity {
             tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server");
             return false;
         }
+
         if (lines.length > 3 && !lines[3].isEmpty())
             f.share_url = lines[3];
         else
             f.share_url = f.full_url.split("\\?")[0];
 
+        if (prefs.getBoolean("use_share_url", false))
+            createShareUrl(f);
+
         return true;
+    }
+
+    void createShareUrl(F f) {
+        try {
+            // Generate random key
+            String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+            SecureRandom random = new SecureRandom();
+            StringBuilder key = new StringBuilder();
+            for (int i = 0; i < 12; i++)
+                key.append(chars.charAt(random.nextInt(chars.length())));
+
+            // Extract file path from URL and decode it
+            URL url = new URL(f.full_url);
+            String filePath = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
+
+            // Build share API URL (base URL without file path)
+            String shareApiUrl = url.getProtocol() + "://" + url.getHost();
+            if (url.getPort() != -1)
+                shareApiUrl += ":" + url.getPort();
+            shareApiUrl += "/?share";
+
+            // Get expiration
+            EditText expField = findViewById(R.id.share_expiration);
+            String expValue = expField.getText().toString();
+            int[] parsed = parseExpiration(expValue);
+            String expiration = "";
+            if (parsed[1] >= 0) {
+                int minutes = parsed[0];
+                if (parsed[1] == 1) minutes *= 60;
+                else if (parsed[1] == 2) minutes *= 1440;
+                expiration = String.valueOf(minutes);
+            }
+
+            // Get password
+            EditText pwField = findViewById(R.id.share_password);
+            String sharePw = pwField.getText().toString();
+
+            // Build JSON body
+            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+                    key.toString(), filePath, sharePw, expiration);
+
+            URL apiUrl = new URL(shareApiUrl);
+            HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "text/plain");
+            if (password != null)
+                conn.setRequestProperty("PW", password);
+
+            byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
+            conn.setFixedLengthStreamingMode(body.length);
+            conn.connect();
+
+            OutputStream os = conn.getOutputStream();
+            os.write(body);
+            os.flush();
+
+            int rc = conn.getResponseCode();
+            if (rc >= 300) {
+                Log.w("me.ocv.partyup", "Share creation failed: " + rc);
+                conn.disconnect();
+                return;
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            String response = br.readLine();
+            conn.disconnect();
+
+            // Parse response: "created share: https://..."
+            if (response != null && response.startsWith("created share: "))
+                f.share_url = response.substring(15);
+
+        } catch (Exception ex) {
+            Log.w("me.ocv.partyup", "Share creation error: " + ex.toString());
+        }
     }
 
     void onsuccess() {
@@ -491,6 +644,7 @@ public class XferActivity extends AppCompatActivity {
         }
 
         findViewById(R.id.progbar).setVisibility(View.GONE);
+        findViewById(R.id.share_settings).setVisibility(View.GONE);
         findViewById(R.id.successbuttons).setVisibility(View.VISIBLE);
 
         Button btn = (Button) findViewById(R.id.btnExit);
