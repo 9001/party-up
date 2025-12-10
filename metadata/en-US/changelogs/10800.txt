@@ -1,0 +1,1 @@
+• new: create shares, optionally with lifetimes (thx @Larspolo!)

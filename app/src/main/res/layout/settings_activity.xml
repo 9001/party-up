@@ -10,7 +10,7 @@
         android:layout_gravity="bottom"
         android:scaleType="fitEnd"
         android:adjustViewBounds="true"
-        android:alpha="0.3"
+        android:alpha="0.2"
         app:srcCompat="@drawable/ame" />
 
     <FrameLayout
