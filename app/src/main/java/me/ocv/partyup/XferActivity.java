@@ -67,6 +67,7 @@ public class XferActivity extends AppCompatActivity {
     Intent the_intent;
     String password;
     String base_url;
+    String share_url;
     boolean upping;
     String the_msg;
     long bytes_done, bytes_total, t0;
@@ -76,6 +77,7 @@ public class XferActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         upping = false;
+        share_url = null;
 
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         binding = ActivityXferBinding.inflate(getLayoutInflater());
@@ -432,6 +434,9 @@ public class XferActivity extends AppCompatActivity {
                 else if (!do_fileput(conn, a))
                     return;
             }
+            if (prefs.getBoolean("use_share_url", false))
+                createShareUrl(files);
+
             findViewById(R.id.upper_info).post(() -> onsuccess());
         } catch (Exception ex) {
             tshow_msg("Error2: " + ex.toString() + "\n\nmaybe wrong password?");
@@ -538,13 +543,10 @@ public class XferActivity extends AppCompatActivity {
         else
             f.share_url = f.full_url.split("\\?")[0];
 
-        if (prefs.getBoolean("use_share_url", false))
-            createShareUrl(f);
-
         return true;
     }
 
-    void createShareUrl(F f) {
+    void createShareUrl(F[] f) {
         try {
             // Generate random key
             String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -553,9 +555,7 @@ public class XferActivity extends AppCompatActivity {
             for (int i = 0; i < 12; i++)
                 key.append(chars.charAt(random.nextInt(chars.length())));
 
-            // Extract file path from URL and decode it
-            URL url = new URL(f.full_url);
-            String filePath = java.net.URLDecoder.decode(url.getPath(), "UTF-8");
+            URL url = new URL(f[0].full_url);
 
             // Build share API URL (base URL without file path)
             String shareApiUrl = url.getProtocol() + "://" + url.getHost();
@@ -579,9 +579,18 @@ public class XferActivity extends AppCompatActivity {
             EditText pwField = findViewById(R.id.share_password);
             String sharePw = pwField.getText().toString();
 
+            StringBuilder sharedFilesPaths = new StringBuilder();
+            for (int i = 0; i < files.length; i++){
+                String filePath = java.net.URLDecoder.decode(new URL(f[i].full_url).getPath(), "UTF-8");
+                sharedFilesPaths.append("\"").append(filePath).append("\"");
+                if (i < files.length - 1){
+                    sharedFilesPaths.append(",");
+                }
+            }
+
             // Build JSON body
-            String jsonBody = format("{\"k\":\"%s\",\"vp\":[\"%s\"],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
-                    key.toString(), filePath, sharePw, expiration);
+            String jsonBody = format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+                    key.toString(), sharedFilesPaths, sharePw, expiration);
 
             URL apiUrl = new URL(shareApiUrl);
             HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
@@ -612,7 +621,7 @@ public class XferActivity extends AppCompatActivity {
 
             // Parse response: "created share: https://..."
             if (response != null && response.startsWith("created share: "))
-                f.share_url = response.substring(15);
+                share_url = response.substring(15);
 
         } catch (Exception ex) {
             Log.w("me.ocv.partyup", "Share creation error: " + ex.toString());
@@ -622,10 +631,13 @@ public class XferActivity extends AppCompatActivity {
     void onsuccess() {
         String msg = "✅ 👍\n\nCompleted successfully";
         if (files != null) {
-            if (files.length == 1)
+            if (files.length == 1 && share_url == null) {
                 msg += "\n\n" + files[0].share_url;
-            else
+            } else if (share_url != null) {
+                msg += "\n\n" + share_url;
+            } else {
                 msg += "\n\n" + files.length + " files OK";
+            }
         }
         show_msg(msg);
         ((TextView) findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
@@ -659,7 +671,7 @@ public class XferActivity extends AppCompatActivity {
         }
         vcopy.setOnClickListener(v -> copylink());
         vshare.setOnClickListener(v -> sharelink());
-        if (files.length > 1)
+        if (files.length > 1 && share_url == null)
             vshare.setVisibility(View.GONE);
     }
 
@@ -668,8 +680,13 @@ public class XferActivity extends AppCompatActivity {
             return;
 
         String links = "";
-        for (F file : files)
-            links += file.share_url + "\n";
+
+        if (share_url != null) {
+            links = share_url;
+        } else {
+            for (F file : files)
+                links += file.share_url + "\n";
+        }
 
         ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData cd = ClipData.newPlainText("copyparty upload", links);
@@ -678,19 +695,29 @@ public class XferActivity extends AppCompatActivity {
     }
 
     void sharelink() {
-        if (files == null || files.length > 1)
+        if (files == null)
             return;
 
-        F f = files[0];
+        String link_to_share;
+
+        if (share_url != null) {
+            link_to_share = share_url;
+        } else if (files.length > 1) {
+            return;
+        } else {
+            link_to_share = files[0].share_url;
+        }
+
+
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
         send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
-        send.putExtra(Intent.EXTRA_TEXT, f.share_url);
+        send.putExtra(Intent.EXTRA_TEXT, link_to_share);
         //startActivity(Intent.createChooser(send, "Share file link"));
 
         Intent view = new Intent(Intent.ACTION_VIEW);
-        view.setData(Uri.parse(f.share_url));
+        view.setData(Uri.parse(link_to_share));
 
         Intent i = Intent.createChooser(send, "Share file link");
         i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{view});
