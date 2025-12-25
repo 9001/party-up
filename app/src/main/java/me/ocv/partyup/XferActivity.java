@@ -699,13 +699,15 @@ public class XferActivity extends AppCompatActivity {
             return;
 
         String link_to_share;
-        if(files.length > 1 && !prefs.getBoolean("use_share_url", false)) {
-            return;
-        } else if (prefs.getBoolean("use_share_url", false)){
+
+        if (share_url != null) {
             link_to_share = share_url;
+        } else if (files.length > 1) {
+            return;
         } else {
             link_to_share = files[0].share_url;
         }
+
 
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
