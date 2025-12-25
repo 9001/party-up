@@ -48,17 +48,24 @@ public class SettingsActivity extends AppCompatActivity {
                     if (passwd.getText() == null || passwd.getText().isEmpty()) {
                         return "Password is not set";
                     } else {
-                        return null;
+                        return "Click to change password";
                     }
                 });
-                passwd.setOnBindEditTextListener(editText ->
+                passwd.setOnBindEditTextListener(editText -> {
                     editText.setInputType(
-                        InputType.TYPE_CLASS_TEXT |
-                        InputType.TYPE_TEXT_VARIATION_PASSWORD
-                    )
-                );
+                            InputType.TYPE_CLASS_TEXT |
+                                    InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    );
+                    editText.setOnLongClickListener(view -> {
+                        editText.setInputType(
+                                InputType.TYPE_CLASS_TEXT
+                        );
+                        editText.setOnLongClickListener(null);
+                        return true;
+                    });
+                });
 
-                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\"");
+                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\" \n\n Long press to reveal the password");
             }
 
             EditTextPreference linkExp = findPreference("link_expiration");
