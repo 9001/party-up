@@ -3,6 +3,7 @@ package me.ocv.partyup;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.text.InputType;
 import android.view.MenuItem;
 
 import androidx.appcompat.app.ActionBar;
@@ -10,7 +11,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.widget.Toast;
 
 import androidx.preference.EditTextPreference;
-import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 
 public class SettingsActivity extends AppCompatActivity {
@@ -41,6 +41,32 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
+
+            EditTextPreference passwd = findPreference("server_password");
+            if (passwd != null) {
+                passwd.setSummaryProvider(preference -> {
+                    if (passwd.getText() == null || passwd.getText().isEmpty()) {
+                        return "Password is not set";
+                    } else {
+                        return "Click to change password";
+                    }
+                });
+                passwd.setOnBindEditTextListener(editText -> {
+                    editText.setInputType(
+                            InputType.TYPE_CLASS_TEXT |
+                                    InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    );
+                    editText.setOnLongClickListener(view -> {
+                        editText.setInputType(
+                                InputType.TYPE_CLASS_TEXT
+                        );
+                        editText.setOnLongClickListener(null);
+                        return true;
+                    });
+                });
+
+                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\" \n\n Long press to reveal the password");
+            }
 
             EditTextPreference linkExp = findPreference("link_expiration");
             if (linkExp != null) {
