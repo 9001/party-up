@@ -31,6 +31,7 @@
         app:srcCompat="@android:drawable/ic_dialog_email" />
 
     <LinearLayout
+        android:id="@+id/linearLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
@@ -44,23 +45,30 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_weight="0"
-            android:orientation="horizontal">
-
-            <Space
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
+            android:orientation="vertical">
 
             <TextView
                 android:id="@+id/upper_info"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Upload the following?" />
+                android:text="Upload the following?"
+                android:textAlignment="center" />
 
-            <Space
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal">
+
+                <Space
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+                <Space
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
@@ -75,8 +83,8 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -88,8 +96,8 @@
                     android:id="@+id/share_expiration"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:hint="e.g. 30m, 2h, 7d"
                     android:inputType="text"
                     android:textSize="14sp" />
@@ -98,8 +106,8 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -111,8 +119,8 @@
                     android:id="@+id/share_password"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:layout_marginStart="8dp"
+                    android:layout_weight="1"
                     android:hint="optional"
                     android:inputType="text"
                     android:textSize="14sp" />
@@ -135,15 +143,23 @@
             <Button
                 android:id="@+id/btnCopyLink"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
                 android:text="copy\nlink" />
 
             <Button
+                android:id="@+id/btnQrCode"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:text="Show QR code" />
+
+            <Button
                 android:id="@+id/btnShareLink"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
                 android:text="share\nlink" />
@@ -151,7 +167,7 @@
             <Button
                 android:id="@+id/btnExit"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
                 android:text="close\napp" />

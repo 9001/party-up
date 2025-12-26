@@ -4,6 +4,7 @@ import static java.lang.String.format;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Dialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -12,11 +13,18 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -25,8 +33,10 @@ import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.preference.PreferenceManager;
@@ -37,6 +47,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +79,7 @@ public class XferActivity extends AppCompatActivity {
     String password;
     String base_url;
     String share_url;
+    Bitmap share_qr;
     boolean upping;
     String the_msg;
     long bytes_done, bytes_total, t0;
@@ -78,6 +90,7 @@ public class XferActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         upping = false;
         share_url = null;
+        share_qr = null;
 
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         binding = ActivityXferBinding.inflate(getLayoutInflater());
@@ -663,6 +676,7 @@ public class XferActivity extends AppCompatActivity {
         btn.setOnClickListener(v -> finishAndRemoveTask());
 
         Button vcopy = (Button) findViewById(R.id.btnCopyLink);
+        Button vqrcode = (Button) findViewById(R.id.btnQrCode);
         Button vshare = (Button) findViewById(R.id.btnShareLink);
         if (files == null) {
             vcopy.setVisibility(View.GONE);
@@ -671,8 +685,12 @@ public class XferActivity extends AppCompatActivity {
         }
         vcopy.setOnClickListener(v -> copylink());
         vshare.setOnClickListener(v -> sharelink());
-        if (files.length > 1 && share_url == null)
+        vqrcode.setOnClickListener(view -> showQr());
+        if (files.length > 1 && share_url == null){
             vshare.setVisibility(View.GONE);
+            vqrcode.setVisibility(View.GONE);
+        }
+
     }
 
     void copylink() {
@@ -722,5 +740,48 @@ public class XferActivity extends AppCompatActivity {
         Intent i = Intent.createChooser(send, "Share file link");
         i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{view});
         startActivity(i);
+    }
+
+    void showQr(){
+        if (share_qr == null){
+            String url_to_share;
+            if (share_url != null)
+                url_to_share = share_url;
+            else
+                url_to_share = files[0].full_url;
+
+            try {
+                QRCodeWriter qrCodeWriter = new QRCodeWriter();
+                int size = 256;
+                BitMatrix bitMatrix = qrCodeWriter.encode(url_to_share, BarcodeFormat.QR_CODE, size, size);
+
+                Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
+
+                for (int x = 0; x < size; x++) {
+                    for (int y = 0; y < size; y++) {
+                        bitmap.setPixel(x, y,
+                                bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                    }
+                }
+
+                share_qr = bitmap;
+
+            } catch (WriterException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        AlertDialog.Builder ImageDialog = new AlertDialog.Builder(XferActivity.this);
+        ImageView shownImage = new ImageView(XferActivity.this);
+        shownImage.setImageBitmap(share_qr);
+        shownImage.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+        shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        shownImage.setAdjustViewBounds(true);
+
+        ImageDialog.setView(shownImage);
+
+        ImageDialog.show();
     }
 }
