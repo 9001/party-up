@@ -1,0 +1,4 @@
+• new: show QR-code after upload (thx @samswi!)
+• new: multiple files, one share (thx @samswi!)
+• new: hide password in settings (thx @samswi!)
+• new: URL syntax hint in settings

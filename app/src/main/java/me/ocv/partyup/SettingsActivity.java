@@ -42,6 +42,11 @@ public class SettingsActivity extends AppCompatActivity {
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
+            EditTextPreference surl = findPreference("server_url");
+            if (surl != null) {
+                surl.setDialogMessage("to upload into a folder, add the folder at the end of the URL, for example “https://ask.com/foo/bar/”\n\nExample: “https://ask.com/%Y/%m/” will create\n“/Year/month/” (%Y/%m/%d, %H:%M:%S)");
+            }
+
             EditTextPreference passwd = findPreference("server_password");
             if (passwd != null) {
                 passwd.setSummaryProvider(preference -> {
@@ -65,7 +70,7 @@ public class SettingsActivity extends AppCompatActivity {
                     });
                 });
 
-                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\" \n\n Long press to reveal the password");
+                passwd.setDialogMessage("if server has enabled login using usernames, input “<username>:<password>”,\nfor example azure:hunter2\n\nLong-press to reveal the password");
             }
 
             EditTextPreference linkExp = findPreference("link_expiration");
