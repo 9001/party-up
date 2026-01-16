@@ -4,6 +4,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Build;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.view.View;
@@ -25,7 +26,13 @@ public class MainActivity extends AppCompatActivity {
                 "<p>Funfact: You can run the copyparty server itself on any device where Python is available -- and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>";
 
         TextView tv = ((TextView)findViewById(R.id.textView4));
-        tv.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+			tv.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+		} else {
+			tv.setText(Html.fromHtml(txt));
+		}
+
         tv.setMovementMethod(LinkMovementMethod.getInstance());
 
         ((Button)findViewById(R.id.settingsBtn)).setOnClickListener(new View.OnClickListener() {
