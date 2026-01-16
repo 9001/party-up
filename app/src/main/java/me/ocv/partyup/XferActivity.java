@@ -1,6 +1,5 @@
 package me.ocv.partyup;
 
-import static java.lang.String.format;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -60,14 +59,16 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.function.Consumer;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
-import me.ocv.partyup.Xfer;
+import me.ocv.partyup.Uploader;
+import me.ocv.partyup.Discovery;
 
 class CustomFile {
 	public Uri handle;
-	public String name;
 	public Long size;
+	public String name;
 	public String full_url;
 	public String share_url;
 	public String desc;
@@ -76,18 +77,57 @@ class CustomFile {
 	public String ext;
 }
 
+class Progress {
+	// bytes
+	public long done;
+	public long total;
+
+	public long t0 = System.currentTimeMillis();
+
+	public long left() {
+		return Math.max(0, total - done);
+	};
+
+	public double perc() {
+		return total > 0 ? (double) done / total : 0.0;
+	};
+
+	public double speed() {
+		// in bytes
+		if (t0 == 0 || done == 0)
+			return 0.0;
+		double seconds = (System.currentTimeMillis() - t0) / 1000.0;
+		return seconds <= 0 ? 0.0 : done / seconds;
+	};
+
+	public long eta() {
+		// seconds
+		double s = speed();
+		return s <= 0 ? -1 : (long) (left() / speed());
+	}
+
+	public String stats() {
+		String format = String.join("\n", "Bytes: %d/%d (%d)", "Percentage: %.2f", "Speed: %.2f MB/s", "ETA: %d sec");
+		return String.format(format, done, total, left(), perc() * 100, speed() / (1024.0 * 1024.0), eta());
+	}
+}
+
 public class XferActivity extends AppCompatActivity {
 	ActivityXferBinding binding;
 	SharedPreferences prefs;
-	Intent the_intent;
-	String password;
+
 	String base_url;
+	String password;
+
 	String share_url;
 	Bitmap share_qr;
-	boolean upping;
-	String the_msg;
-	long bytes_done, bytes_total, t0;
+	Boolean upping;
+	Boolean autosend;
 	CustomFile[] files;
+
+	Discovery discovery = new Discovery();
+	Uploader uploader = new Uploader();
+	Progress progress = new Progress();
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -101,53 +141,40 @@ public class XferActivity extends AppCompatActivity {
 		setContentView(binding.getRoot());
 		setSupportActionBar(binding.toolbar);
 
-		the_intent = getIntent();
-		String etype = the_intent.getType();
-		String action = the_intent.getAction();
-		boolean one = Intent.ACTION_SEND.equals(action);
-		boolean many = Intent.ACTION_SEND_MULTIPLE.equals(action);
-		if (etype == null || (!one && !many)) {
-			show_msg("cannot share content;\naction: " + action + "\ntype: " + etype);
-			return;
-		}
-
-		Uri[] handles = null;
-		if (many) {
-			ArrayList<Uri> x = the_intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-			handles = x.toArray(new Uri[0]);
-		} else if (one) {
-			Uri uri = (Uri) the_intent.getParcelableExtra(Intent.EXTRA_STREAM);
-			if (uri != null)
-				handles = new Uri[] { uri };
-			else
-				the_msg = the_intent.getStringExtra(Intent.EXTRA_TEXT);
-		}
-		if (handles != null) {
-			files = new CustomFile[handles.length];
-			for (int a = 0; a < handles.length; a++) {
-				CustomFile customFile = new CustomFile();
-				customFile.handle = handles[a];
-				customFile.name = null;
-				customFile.size = -1;
-				files[a] = customFile;
-			}
-			handleSendImage();
-		} else if (the_msg != null) {
-			handleSendText();
-		} else {
-			show_msg("cannot decide on what to send for " + the_intent.getType());
-			return;
-		}
-
+		autosend = prefs.getBoolean("autosend", false);
+		base_url = prefs.getString("server_url", "");
 		password = prefs.getString("server_password", "");
 		if (password == null || password.isEmpty() || password.equals("Default value"))
 			password = null;
+
+		files = discovery.parseIntent(this, getIntent(), (msg) -> {
+			if ("StoragePermissionNeeded".equals(msg))
+				need_storage(msg);
+			else
+				tshow_msg(msg);
+		});
+
+		uploader.setContext(this);
+		uploader.setPassword(password);
+		uploader.setServerUrl(base_url);
+
+		// Looping over all prepared files, can do additional work here
+		for (CustomFile cf : files) {
+			if (cf.size > 0) {
+				progress.total += cf.size;
+			}
+		}
 
 		final FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
 		fab.setOnClickListener(v -> {
 			fab.setVisibility(View.GONE);
 			do_up();
 		});
+
+		if (autosend)
+			do_up();
+		else
+			showShareSettings();
 	}
 
 	private void show_msg(String txt) {
@@ -159,166 +186,50 @@ public class XferActivity extends AppCompatActivity {
 		tv.post(() -> tv.setText(txt));
 	}
 
-	void need_storage(String exmsg) {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && exmsg.contains("EACCES")) {
-			show_msg(exmsg + "\n\nThe app you shared from uses deprecated file APIs.");
-			return;
-		}
+	private String getTextBody() {
+		String messages = "";
 
-		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-			request_storage();
-			return;
-		}
+		int counter = 1;
+		for (int i = 0; i < files.length; i++) {
+			if (counter > 10)
+				break;
 
-		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-		if (this.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED)
-			return; // already have it, so that's not why it failed
-
-		if (!shouldShowRequestPermissionRationale(perm)) {
-			request_storage();
-			return;
-		}
-
-		AlertDialog.Builder ab = new AlertDialog.Builder(findViewById(R.id.upper_info).getContext());
-		ab.setMessage(
-				"PartyUP! needs additional permissions to read that file, because the app you shared it from is using old APIs.")
-				.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-						request_storage();
-					}
-				}).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-
-					}
-				}).show();
-	}
-
-	void request_storage() {
-		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-		requestPermissions(new String[] { perm }, 573);
-	}
-
-	@Override
-	public void onRequestPermissionsResult(int permRequestCode, String perms[], int[] grantRes) {
-		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-		if (permRequestCode != 573)
-			return;
-
-		for (int a = 0; a < grantRes.length; a++) {
-			if (!perms[a].equals(perm))
+			CustomFile cf = files[i];
+			if (cf.mime.equals("text/plain") || cf.content == null)
 				continue;
 
-			if (grantRes[a] != PackageManager.PERMISSION_GRANTED)
-				return;
-
-			handleSendImage();
-		}
-	}
-
-	String getext(String mime) {
-		if (mime == null)
-			return "bin";
-
-		mime = mime.replace(';', ' ').split(" ")[0];
-
-		switch (mime) {
-			case "audio/ogg":
-				return "ogg";
-			case "audio/mpeg":
-				return "mp3";
-			case "audio/mp4":
-				return "m4a";
-			case "image/jpeg":
-				return "jpg";
+			messages = messages.concat(String.format("%d. %s" + (counter < 10 ? "\n" : ""), counter, cf.content));
+			counter++;
 		}
 
-		if (mime.startsWith("text/"))
-			return "txt";
+		String header = String.format("Post%s the following link%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "",
+				autosend ? ":" : "?");
+		return counter == 1 ? "" : String.join("\n\n", header, messages, counter > 10 ? "[...]" : "");
+	}
 
-		if (mime.contains("/")) {
-			mime = mime.split("/")[1];
-			if (mime.matches("^[a-zA-Z0-9]{1,8}$"))
-				return mime;
+	private String getFileBody() {
+		String filenames = "";
+		int counter = 1;
+		for (int i = 0; i < files.length; i++) {
+			if (counter > 10)
+				break;
+
+			CustomFile file = files[i];
+			if (file.mime.equals("text/plain") || file.size == null)
+				continue;
+
+			filenames = filenames.concat(
+					String.format(
+							"%d. %s [%.1fMB]" + (counter < 10 ? "\n" : ""),
+							counter,
+							file.name,
+							file.size < 0 ? 0.0 : file.size / (1024 * 1024)));
+			counter++;
 		}
 
-		return "bin";
-	}
-
-	int[] parseExpiration(String value) {
-		// Returns [number, unit] where unit: 0=minutes, 1=hours, 2=days,
-		// -1=invalid/empty
-		if (value == null || value.trim().isEmpty())
-			return new int[] { 0, -1 };
-
-		value = value.trim().toLowerCase();
-		if (!value.matches("^\\d+[mhd]?$"))
-			return new int[] { 0, -1 };
-
-		char unit = value.charAt(value.length() - 1);
-		int num;
-		int unitType;
-
-		if (Character.isDigit(unit)) {
-			num = Integer.parseInt(value);
-			unitType = 0; // minutes
-		} else {
-			num = Integer.parseInt(value.substring(0, value.length() - 1));
-			switch (unit) {
-				case 'h':
-					unitType = 1;
-					break;
-				case 'd':
-					unitType = 2;
-					break;
-				default:
-					unitType = 0;
-					break;
-			}
-		}
-		return new int[] { num, unitType };
-	}
-
-	String getExpirationMinutes() {
-		String value = prefs.getString("link_expiration", "");
-		int[] parsed = parseExpiration(value);
-		if (parsed[1] < 0)
-			return "";
-
-		int minutes = parsed[0];
-		if (parsed[1] == 1)
-			minutes *= 60; // hours
-		else if (parsed[1] == 2)
-			minutes *= 1440; // days
-
-		return String.valueOf(minutes);
-	}
-
-	String getExpirationLabel() {
-		String value = prefs.getString("link_expiration", "");
-		int[] parsed = parseExpiration(value);
-		if (parsed[1] < 0)
-			return "never expires";
-
-		int num = parsed[0];
-		switch (parsed[1]) {
-			case 0:
-				return num + " minute" + (num != 1 ? "s" : "");
-			case 1:
-				return num + " hour" + (num != 1 ? "s" : "");
-			case 2:
-				return num + " day" + (num != 1 ? "s" : "");
-			default:
-				return "never expires";
-		}
-	}
-
-	private void handleSendText() {
-		show_msg("Post the following link?\n\n" + the_msg);
-		showShareSettings();
-		if (prefs.getBoolean("autosend", false))
-			do_up();
+		String header = String.format("Upload%s the following file%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "",
+				autosend ? ":" : "?");
+		return counter == 1 ? "" : String.join("\n\n", header, filenames, counter > 10 ? "[...]" : "");
 	}
 
 	private void showShareSettings() {
@@ -334,94 +245,19 @@ public class XferActivity extends AppCompatActivity {
 			expField.setText(defaultExp != null ? defaultExp : "");
 			pwField.setText(defaultPw != null ? defaultPw : "");
 		}
-	}
 
-	@SuppressLint("DefaultLocale")
-	private void handleSendImage() {
-		for (CustomFile customFile : files) {
-			Log.d("me.ocv.partyup", format("handle [%s]", customFile.handle));
-			if (customFile.handle.toString().startsWith("file:///")) {
-				String path = customFile.handle.getPath();
-				customFile.name = path != null ? path.substring(path.lastIndexOf('/') + 1) : "file";
-			} else {
-				// contentresolver returns the wrong filesize (off by 626 bytes)
-				// but we want the name so lets go
-				try {
-					Cursor cur = getContentResolver().query(customFile.handle, null, null, null, null);
-					assert cur != null;
-					int iname = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-					int isize = cur.getColumnIndex(OpenableColumns.SIZE);
-					cur.moveToFirst();
-					customFile.name = cur.getString(iname);
-					customFile.size = cur.getLong(isize);
-					cur.close();
-				} catch (Exception ex) {
-					Log.w("me.ocv.partyup", "contentresolver: " + ex.toString());
-				}
-			}
+		String header = "Hi, Welcome to PartyUP!";
+		String body = String.join("\n",
+				"You are uploading to:", base_url,
+				getTextBody(),
+				getFileBody(),
+				(!autosend ? "Press the button to upload!" : "Starting..."));
+		String footer = String.join("\n",
+				String.format("Total files: %d", files.length),
+				String.format("Total size: %.2fMB", progress.total < 0 ? 0.0 : progress.total / (1024.0 * 1024.0)));
 
-			MessageDigest md = null;
-			if (customFile.name == null) {
-				try {
-					md = MessageDigest.getInstance("SHA-512");
-				} catch (Exception ex) {
-				}
-			}
-
-			// get correct filesize
-			try {
-				InputStream ins = getContentResolver().openInputStream(customFile.handle);
-				assert ins != null;
-				byte[] buf = new byte[128 * 1024];
-				long sz = 0;
-				while (true) {
-					int n = ins.read(buf);
-					if (n <= 0)
-						break;
-
-					sz += n;
-					if (md != null)
-						md.update(buf, 0, n);
-				}
-				customFile.size = sz;
-			} catch (Exception ex) {
-				String exmsg = "Error3: " + ex.toString();
-				show_msg(exmsg);
-				need_storage(exmsg);
-				return;
-			}
-
-			if (md != null) {
-				String csum = Base64.encodeToString(md.digest(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP)
-						.substring(0, 15);
-				customFile.name = format("mystery-file-%s.%s", csum, getext(the_intent.getType()));
-			}
-
-			customFile.desc = format("%s\n\nsize: %,d byte\ntype: %s", customFile.name, customFile.size,
-					the_intent.getType());
-		}
-
-		String msg;
-		bytes_done = bytes_total = 0;
-		if (files.length == 1) {
-			msg = "Upload the following file?\n\n" + files[0].desc;
-			bytes_total = files[0].size;
-		} else {
-			msg = "Upload the following " + files.length + " files?\n\n";
-			for (int a = 0; a < Math.min(10, files.length); a++) {
-				msg += "  ► " + files[a].name + "\n";
-				bytes_total += files[a].size;
-			}
-
-			if (files.length > 10)
-				msg += "[...]\n";
-
-			msg += format("\n(total %,d bytes)", bytes_total);
-		}
-		show_msg(msg);
-		showShareSettings();
-		if (prefs.getBoolean("autosend", false))
-			do_up();
+		String fullBody = String.join("\n\n", header, body, footer);
+		show_msg(fullBody);
 	}
 
 	private void do_up() {
@@ -434,53 +270,62 @@ public class XferActivity extends AppCompatActivity {
 
 	private void do_up2() {
 		try {
-			base_url = prefs.getString("server_url", "");
-			if (base_url == null)
-				throw new Exception("server_url config is invalid");
+			progress.t0 = System.currentTimeMillis();
+			final TextView tv = (TextView) findViewById(R.id.upper_info);
+			final ProgressBar pb = (ProgressBar) findViewById(R.id.progbar);
 
-			if (!base_url.startsWith("http"))
-				base_url = "http://" + base_url;
-
-			if (!base_url.endsWith("/"))
-				base_url += "/";
-
-			if (base_url.contains("%")) {
-				String[] dtc = "%Y %q %m %d %j %H %M %S".split(" ");
-
-				SimpleDateFormat sdf = new SimpleDateFormat("yyyy Q MM dd DDD HH mm ss", Locale.US);
-				sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-				String[] dtp = sdf.format(new Date()).split(" ");
-
-				for (int a = 0; a < dtc.length; a++)
-					base_url = base_url.replace(dtc[a], dtp[a]);
+			class ProgressStats {
+				public long done;
+				public int nfile;
+				public int total_file;
 			}
 
-			t0 = System.currentTimeMillis();
-			tshow_msg("Sending to " + base_url + " ...");
+			final Consumer<ProgressStats> onProgress = (ps) -> {
+				try {
+					tv.post(() -> {
+						progress.done = ps.done;
+						int nfile = ps.nfile;
+						int total_file = ps.total_file;
 
-			int nfiles = files == null ? 1 : files.length;
-			for (int a = 0; a < nfiles; a++) {
-				String full_url = base_url;
-				if (files != null) {
-					CustomFile customFile = files[a];
-					full_url += URLEncoder.encode(customFile.name, "UTF-8");
-					tshow_msg("Sending to " + base_url + " ...\n\n" + customFile.desc);
-					customFile.full_url = full_url;
+						tv.setText(
+								String.join(
+										"\n\n",
+										String.format("Sending to: %s...", base_url),
+										String.format("File: %d of %d\nDesc: %s", nfile + 1, total_file, files[nfile].desc),
+										progress.stats()));
+						pb.setProgress((int) Math.round(progress.perc() * 100));
+					});
+				} catch (Exception e) {
+					Log.e("XferActivity", "Issue in ui updating: " + e.toString());
 				}
+			};
+			Consumer<Error> onError = (err) -> {
+				tshow_msg(err.toString());
+			};
 
-				URL url = new URL(full_url);
-				HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-				conn.setDoOutput(true);
-				if (password != null)
-					conn.setRequestProperty("PW", password);
+			uploader.setOnError(onError);
 
-				if (files == null)
-					do_textmsg(conn);
-				else if (!do_fileput(conn, a))
+			final ProgressStats ps = new ProgressStats();
+			ps.total_file = files.length;
+
+			for (int i = 0; i < files.length; i++) {
+				CustomFile file = files[i];
+				ps.nfile = i;
+
+				Consumer<UploadProgress> onPro = (up) -> {
+					ps.done += up.delta;
+					onProgress.accept(ps);
+				};
+
+				uploader.setOnProgress(onPro);
+				boolean uploaded = uploader.upload(file);
+				if (!uploaded) {
 					return;
+				}
 			}
+
 			if (prefs.getBoolean("use_share_url", false))
-				createShareUrl(files);
+				createShareUrl();
 
 			findViewById(R.id.upper_info).post(() -> onsuccess());
 		} catch (Exception ex) {
@@ -488,118 +333,7 @@ public class XferActivity extends AppCompatActivity {
 		}
 	}
 
-	String read_err(HttpURLConnection conn) {
-		try {
-			byte[] buf = new byte[1024];
-			int n = Math.max(0, conn.getErrorStream().read(buf));
-			return new String(buf, 0, n, StandardCharsets.UTF_8);
-		} catch (Exception ex) {
-			return ex.toString();
-		}
-	}
-
-	// private void do_textmsg(HttpURLConnection conn) throws Exception {
-	// 	byte[] body = ("msg=" + URLEncoder.encode(the_msg, "UTF-8")).getBytes(StandardCharsets.UTF_8);
-	// 	conn.setRequestMethod("POST");
-	// 	conn.setFixedLengthStreamingMode(body.length);
-	// 	conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-	// 	conn.connect();
-	// 	OutputStream os = conn.getOutputStream();
-	// 	os.write(body);
-	// 	os.flush();
-	// 	int rc = conn.getResponseCode();
-	// 	if (rc >= 300) {
-	// 		tshow_msg("Server error " + rc + ":\n" + read_err(conn));
-	// 		conn.disconnect();
-	// 		return;
-	// 	}
-	// 	conn.disconnect();
-	// }
-
-	@SuppressLint("DefaultLocale")
-	private boolean do_fileput(HttpURLConnection conn, int nfile) throws Exception {
-		CustomFile customFile = files[nfile];
-		conn.setRequestMethod("PUT");
-		conn.setFixedLengthStreamingMode(customFile.size);
-		conn.setRequestProperty("Content-Type", "application/octet-stream");
-		conn.connect();
-		final TextView tv = (TextView) findViewById(R.id.upper_info);
-		final ProgressBar pb = (ProgressBar) findViewById(R.id.progbar);
-		OutputStream os = conn.getOutputStream();
-		InputStream ins = getContentResolver().openInputStream(customFile.handle);
-		MessageDigest md = MessageDigest.getInstance("SHA-512");
-		byte[] buf = new byte[128 * 1024];
-		assert ins != null;
-		while (true) {
-			int n = ins.read(buf);
-			if (n <= 0)
-				break;
-
-			bytes_done += n;
-			os.write(buf, 0, n);
-			md.update(buf, 0, n);
-
-			tv.post(() -> {
-				double perc = ((double) bytes_done * 1000) / bytes_total;
-				long td = 1 + System.currentTimeMillis() - t0;
-				double spd = bytes_done / (td / 1000.0);
-				long left = (long) ((bytes_total - bytes_done) / spd);
-				tv.setText(format(
-						"Sending to %s ...\n\nFile %d of %d:\n%s\n\nbytes done:  %,d\nbytes left:  %,d\nspeed:  %.2f MiB/s\nprogress:  %.2f %%\nETA:  %d sec",
-						base_url,
-						nfile + 1,
-						files.length,
-						customFile.desc,
-						bytes_done,
-						bytes_total - bytes_done,
-						spd / 1024 / 1024,
-						perc / 10,
-						left));
-				pb.setProgress((int) Math.round(perc));
-			});
-		}
-		os.flush();
-		int rc = conn.getResponseCode();
-		if (rc >= 300) {
-			tshow_msg("Server error " + rc + ":\n" + read_err(conn));
-			conn.disconnect();
-			return false;
-		}
-		String sha = "";
-		byte[] bsha = md.digest();
-		for (int a = 0; a < 28; a++)
-			sha += format("%02x", bsha[a]);
-
-		BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-
-		ArrayList<String> linesList = new ArrayList<>();
-		String line;
-		while ((line = br.readLine()) != null) {
-			linesList.add(line);
-		}
-		String[] lines = linesList.toArray(new String[0]);
-
-		conn.disconnect();
-
-		if (lines.length < 3) {
-			tshow_msg("SERVER ERROR:\n" + lines[0]);
-			return false;
-		}
-		if (lines[2].indexOf(sha) != 0) {
-			tshow_msg("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha
-					+ " from server");
-			return false;
-		}
-
-		if (lines.length > 3 && !lines[3].isEmpty())
-			customFile.share_url = lines[3];
-		else
-			customFile.share_url = customFile.full_url.split("\\?")[0];
-
-		return true;
-	}
-
-	void createShareUrl(CustomFile[] customFile) {
+	private void createShareUrl() {
 		try {
 			// Generate random key
 			String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -608,7 +342,7 @@ public class XferActivity extends AppCompatActivity {
 			for (int i = 0; i < 12; i++)
 				key.append(chars.charAt(random.nextInt(chars.length())));
 
-			URL url = new URL(customFile[0].full_url);
+			URL url = new URL(files[0].full_url);
 
 			// Build share API URL (base URL without file path)
 			String shareApiUrl = url.getProtocol() + "://" + url.getHost();
@@ -644,7 +378,7 @@ public class XferActivity extends AppCompatActivity {
 			}
 
 			// Build JSON body
-			String jsonBody = format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+			String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
 					key.toString(), sharedFilesPaths, sharePw, expiration);
 
 			URL apiUrl = new URL(shareApiUrl);
@@ -684,7 +418,7 @@ public class XferActivity extends AppCompatActivity {
 	}
 
 	void onsuccess() {
-		String msg = "✅ 👍\n\nCompleted successfully";
+		String msg = "✅👍\n\nCompleted successfully";
 		if (files != null) {
 			if (files.length == 1 && share_url == null) {
 				msg += "\n\n" + files[0].share_url;
@@ -733,8 +467,10 @@ public class XferActivity extends AppCompatActivity {
 		if (files == null) {
 			vcopy.setVisibility(View.GONE);
 			vshare.setVisibility(View.GONE);
+			vqrcode.setVisibility(View.GONE);
 			return;
 		}
+
 		vcopy.setOnClickListener(v -> copylink());
 		vshare.setOnClickListener(v -> sharelink());
 		vqrcode.setOnClickListener(view -> showQr());
@@ -742,7 +478,6 @@ public class XferActivity extends AppCompatActivity {
 			vshare.setVisibility(View.GONE);
 			vqrcode.setVisibility(View.GONE);
 		}
-
 	}
 
 	void copylink() {
@@ -834,4 +569,129 @@ public class XferActivity extends AppCompatActivity {
 
 		ImageDialog.show();
 	}
+
+	void need_storage(String exmsg) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && exmsg.contains("EACCES")) {
+			show_msg(exmsg + "\n\nThe app you shared from uses deprecated file APIs.");
+			return;
+		}
+
+		if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+			request_storage();
+			return;
+		}
+
+		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+		if (this.checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED)
+			return; // already have it, so that's not why it failed
+
+		if (!shouldShowRequestPermissionRationale(perm)) {
+			request_storage();
+			return;
+		}
+
+		AlertDialog.Builder ab = new AlertDialog.Builder(findViewById(R.id.upper_info).getContext());
+		ab.setMessage(
+				"PartyUP! needs additional permissions to read that file, because the app you shared it from is using old APIs.")
+				.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						request_storage();
+					}
+				}).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+
+					}
+				}).show();
+	}
+
+	void request_storage() {
+		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+		requestPermissions(new String[] { perm }, 573);
+	}
+
+	@Override
+	public void onRequestPermissionsResult(int permRequestCode, String perms[], int[] grantRes) {
+		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
+		if (permRequestCode != 573)
+			return;
+
+		for (int a = 0; a < grantRes.length; a++) {
+			if (!perms[a].equals(perm))
+				continue;
+
+			if (grantRes[a] != PackageManager.PERMISSION_GRANTED)
+				return;
+		}
+	}
+
+	int[] parseExpiration(String value) {
+		// Returns [number, unit] where unit: 0=minutes, 1=hours, 2=days,
+		// -1=invalid/empty
+		if (value == null || value.trim().isEmpty())
+			return new int[] { 0, -1 };
+
+		value = value.trim().toLowerCase();
+		if (!value.matches("^\\d+[mhd]?$"))
+			return new int[] { 0, -1 };
+
+		char unit = value.charAt(value.length() - 1);
+		int num;
+		int unitType;
+
+		if (Character.isDigit(unit)) {
+			num = Integer.parseInt(value);
+			unitType = 0; // minutes
+		} else {
+			num = Integer.parseInt(value.substring(0, value.length() - 1));
+			switch (unit) {
+				case 'h':
+					unitType = 1;
+					break;
+				case 'd':
+					unitType = 2;
+					break;
+				default:
+					unitType = 0;
+					break;
+			}
+		}
+		return new int[] { num, unitType };
+	}
+
+	String getExpirationMinutes() {
+		String value = prefs.getString("link_expiration", "");
+		int[] parsed = parseExpiration(value);
+		if (parsed[1] < 0)
+			return "";
+
+		int minutes = parsed[0];
+		if (parsed[1] == 1)
+			minutes *= 60; // hours
+		else if (parsed[1] == 2)
+			minutes *= 1440; // days
+
+		return String.valueOf(minutes);
+	}
+
+	String getExpirationLabel() {
+		String value = prefs.getString("link_expiration", "");
+		int[] parsed = parseExpiration(value);
+		if (parsed[1] < 0)
+			return "never expires";
+
+		int num = parsed[0];
+		switch (parsed[1]) {
+			case 0:
+				return num + " minute" + (num != 1 ? "s" : "");
+			case 1:
+				return num + " hour" + (num != 1 ? "s" : "");
+			case 2:
+				return num + " day" + (num != 1 ? "s" : "");
+			default:
+				return "never expires";
+		}
+	}
+
 }

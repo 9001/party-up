@@ -1,5 +1,6 @@
 package me.ocv.partyup;
 
+import android.util.Base64;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -7,12 +8,13 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Log;
 
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
 public class Discovery {
-	private Content context;
+	private Context context;
 	private Consumer<String> onError;
 
 	public CustomFile[] parseIntent(
@@ -33,7 +35,7 @@ public class Discovery {
 		if (etype == null || (!one && !many)) {
 			this.onError.accept(
 					"cannot share content;\naction: " + action + "\ntype: " + etype);
-			return new CustomFile[0];
+			return files.toArray(new CustomFile[0]);
 		}
 
 		Uri[] handles = null;
@@ -54,9 +56,11 @@ public class Discovery {
 			for (Uri uri : handles) {
 				CustomFile cf = new CustomFile();
 				cf.handle = uri;
-				cf.size = -1;
 				cf.mime = etype;
 				parseFile(cf);
+				
+				if (cf.size == null) continue;	
+
 				files.add(cf);
 			}
 		} else if (the_msg != null) {
@@ -149,7 +153,7 @@ public class Discovery {
 
 		// get correct filesize
 		try {
-			InputStream ins = this.context.getContentResolver().openInputStream(customFile.handle);
+			InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
 			assert ins != null;
 			byte[] buf = new byte[128 * 1024];
 			long sz = 0;
@@ -162,8 +166,9 @@ public class Discovery {
 				if (md != null)
 					md.update(buf, 0, n);
 			}
-			customFile.size = sz;
+			cf.size = sz;
 		} catch (Exception ex) {
+			this.onError.accept("StoragePermissionNeeded");
 			String exmsg = "Error3: " + ex.toString();
 			this.onError.accept("StoragePermissionNeeded: " + exmsg);
 			return;
@@ -172,13 +177,13 @@ public class Discovery {
 		if (md != null) {
 			String csum = Base64.encodeToString(md.digest(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP)
 					.substring(0, 15);
-			customFile.name = String.format("mystery-file-%s.%s", csum, cf.ext);
+			cf.name = String.format("mystery-file-%s.%s", csum, cf.ext);
 		}
 
-		customFile.desc = String.format(
+		cf.desc = String.format(
 				"%s\n\nsize: %,d byte\ntype: %s",
-				customFile.name,
-				customFile.size,
+				cf.name,
+				cf.size,
 				cf.mime);
 	}
 }
