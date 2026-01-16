@@ -4,6 +4,9 @@
 *.apk
 *.jks
 *.keystore
+*.settings
+*.project
+*.classpath
 .gradle
 .idea
 /local.properties
@@ -15,6 +18,7 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 */build
+build/*
 /captures
 output.json
 google-services.json
