@@ -37,7 +37,8 @@ public class Uploader {
 		Log.e("Uploader", "Upload error: " + err.toString());
 	};
 	private Consumer<UploadProgress> onProgress = (progress) -> {
-		Log.i("Uploader", String.format("Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
+		Log.i("Uploader",
+				String.format("Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
 	};
 	private Runnable onInit = () -> {
 		Log.d("Uploader", "Uploading started!");
@@ -47,89 +48,102 @@ public class Uploader {
 	};
 	private Context context;
 
-	public boolean upload(CustomFile cf) throws Exception {
-		HttpURLConnection conn = makeConnection(cf);
+	private boolean uploadFile(CustomFile cf, HttpURLConnection conn) throws Exception {
+		Log.d("Uploader", String.format("Identified '%s' as a file (%s) with size: %d", cf.name, cf.mime, cf.size));
 
-		if (!cf.mime.equals("text/plain")) { // File upload (AKA PUT)
-			conn.setRequestMethod("PUT");
-			Log.d("Uploader", String.format("Identified '%s' as a file (%s) with size: %d", cf.name, cf.mime, cf.size));
-			conn.setFixedLengthStreamingMode(cf.size);
-			conn.setRequestProperty("Content-Type", "application/octet-stream");
-			conn.connect();
-			this.onInit.run();
+		conn.setRequestMethod("PUT");
+		conn.setFixedLengthStreamingMode(cf.size);
+		conn.setRequestProperty("Content-Type", "application/octet-stream");
+		conn.connect();
+		this.onInit.run();
 
-			OutputStream os = conn.getOutputStream();
-			InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
-			MessageDigest md = MessageDigest.getInstance("SHA-512");
+		OutputStream os = conn.getOutputStream();
+		InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
+		MessageDigest md = MessageDigest.getInstance("SHA-512");
 
-			byte[] buf = new byte[128 * 1024];
+		byte[] buf = new byte[128 * 1024];
 
-			UploadProgress up = new UploadProgress();
-			up.total = cf.size;
-			up.done = 0;
-			up.delta = 0;
+		UploadProgress up = new UploadProgress();
+		up.total = cf.size;
+		up.done = 0;
+		up.delta = 0;
 
-			while (true) {
-				int n = ins.read(buf);
-				if (n == -1)
-					break;
+		while (true) {
+			int n = ins.read(buf);
+			if (n == -1)
+				break;
 
-				os.write(buf, 0, n);
-				md.update(buf, 0, n);
+			os.write(buf, 0, n);
+			md.update(buf, 0, n);
 
-				up.delta = n;
-				up.done += n;
-				this.onProgress.accept(up);
-			}
-
-			os.flush();
-			int rc = conn.getResponseCode();
-			if (rc >= 300) {
-				this.onError.accept(new Error("Server error " + rc + ":\n" +
-						this.read_err(conn)));
-				conn.disconnect();
-				return false;
-			}
-
-			boolean isSuccess = uploadSuccess(md, conn, cf);
-			if (!isSuccess) {
-				conn.disconnect();
-				return false;
-			}
-		} else {
-			if (cf.content == null) {
-				conn.disconnect();
-				return false;
-			}
-
-			byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8")).getBytes(StandardCharsets.UTF_8);
-			conn.setRequestMethod("POST");
-			conn.setFixedLengthStreamingMode(body.length);
-			conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
-			conn.connect();
-
-			OutputStream os = conn.getOutputStream();
-			os.write(body);
-			os.flush();
-
-			UploadProgress up = new UploadProgress();
-			up.delta = (long) body.length;
-			up.total = (long) body.length;
-			up.done = (long) body.length;
-
+			up.delta = n;
+			up.done += n;
 			this.onProgress.accept(up);
-
-			int rc = conn.getResponseCode();
-			if (rc >= 300) {
-				this.onError.accept(new Error("Server error " + rc + ":\n" + read_err(conn)));
-				conn.disconnect();
-				return false;
-			}
 		}
 
-		this.onComplete.run();
-		conn.disconnect();
+		os.flush();
+		int rc = conn.getResponseCode();
+		if (rc >= 300) {
+			this.onError.accept(new Error("Server error " + rc + ":\n" +
+					this.read_err(conn)));
+			conn.disconnect();
+			return false;
+		}
+		return uploadSuccess(md, conn, cf);
+	}
+
+	private boolean uploadText(CustomFile cf, HttpURLConnection conn) throws Exception {
+		if (cf.content == null) {
+			conn.disconnect();
+			return false;
+		}
+
+		byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8")).getBytes(StandardCharsets.UTF_8);
+		conn.setRequestMethod("POST");
+		conn.setFixedLengthStreamingMode(body.length);
+		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
+		conn.connect();
+
+		OutputStream os = conn.getOutputStream();
+		os.write(body);
+		os.flush();
+
+		UploadProgress up = new UploadProgress();
+		up.delta = (long) body.length;
+		up.total = (long) body.length;
+		up.done = (long) body.length;
+
+		this.onProgress.accept(up);
+
+		int rc = conn.getResponseCode();
+		if (rc >= 300) {
+			this.onError.accept(new Error("Server error " + rc + ":\n" + read_err(conn)));
+			conn.disconnect();
+			return false;
+		}
+
 		return true;
+	}
+
+	public boolean upload(CustomFile cf) throws Exception {
+		HttpURLConnection conn = makeConnection(cf);
+		cf.full_url = conn.getURL().toString();
+
+		boolean uploadSuccess = false;
+
+		if (cf.mime.equals("text/plain")) {
+			uploadSuccess = this.uploadText(cf, conn);
+			// Text (aka links) Upload POST
+		} else {
+			// Files Upload PUT
+			uploadSuccess = this.uploadFile(cf, conn);
+		}
+
+		if (uploadSuccess)
+			this.onComplete.run();
+
+		conn.disconnect();
+		return uploadSuccess;
 	}
 
 	private HttpURLConnection makeConnection(CustomFile customFile) throws Exception {
@@ -244,4 +258,13 @@ public class Uploader {
 
 		Log.d("Uploader", "Server Url: " + this.serverUrl);
 	}
+
+	public String getServerUrl() {
+		return this.serverUrl;
+	}
+
+	public String getPassword() {
+		return this.password;
+	}
+
 }

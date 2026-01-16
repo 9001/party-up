@@ -1,6 +1,5 @@
 package me.ocv.partyup;
 
-
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
@@ -46,6 +45,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.lang.reflect.Array;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -75,6 +75,41 @@ class CustomFile {
 	public String content;
 	public String mime;
 	public String ext;
+
+	public boolean isSharable() {
+		boolean hasUrl = (share_url != null && !share_url.isEmpty()) ||
+				(full_url != null && !full_url.isEmpty());
+		boolean isText = "text/plain".equals(mime);
+
+		return hasUrl && !isText;
+	}
+
+	public String getBestUrl() {
+		if (!isSharable())
+			return "";
+		if (share_url != null && !share_url.isEmpty()) {
+			return share_url;
+		}
+		if (full_url != null && !full_url.isEmpty()) {
+			return full_url;
+		}
+		return "";
+	}
+
+	@Override
+	public String toString() {
+		return "CustomFile{" +
+				"handle=" + String.valueOf(handle) +
+				", size=" + String.valueOf(size) +
+				", name=" + String.valueOf(name) +
+				", full_url=" + String.valueOf(full_url) +
+				", share_url=" + String.valueOf(share_url) +
+				", content=" + String.valueOf(content) +
+				", mime=" + String.valueOf(mime) +
+				", ext=" + String.valueOf(ext) +
+				'}';
+	}
+
 }
 
 class Progress {
@@ -119,8 +154,6 @@ public class XferActivity extends AppCompatActivity {
 	String base_url;
 	String password;
 
-	String share_url;
-	Bitmap share_qr;
 	Boolean upping;
 	Boolean autosend;
 	CustomFile[] files;
@@ -133,8 +166,6 @@ public class XferActivity extends AppCompatActivity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		upping = false;
-		share_url = null;
-		share_qr = null;
 
 		prefs = PreferenceManager.getDefaultSharedPreferences(this);
 		binding = ActivityXferBinding.inflate(getLayoutInflater());
@@ -291,7 +322,8 @@ public class XferActivity extends AppCompatActivity {
 								String.join(
 										"\n\n",
 										String.format("Sending to: %s...", base_url),
-										String.format("File: %d of %d\nDesc: %s", nfile + 1, total_file, files[nfile].desc),
+										String.format("File: %d of %d\nDesc: %s", nfile + 1, total_file,
+												files[nfile].desc),
 										progress.stats()));
 						pb.setProgress((int) Math.round(progress.perc() * 100));
 					});
@@ -324,121 +356,43 @@ public class XferActivity extends AppCompatActivity {
 				}
 			}
 
-			if (prefs.getBoolean("use_share_url", false))
-				createShareUrl();
-
+			// Handle creation of share url in `onsuccess`
 			findViewById(R.id.upper_info).post(() -> onsuccess());
 		} catch (Exception ex) {
 			tshow_msg("Error2: " + ex.toString() + "\n\nmaybe wrong password?");
 		}
 	}
 
-	private void createShareUrl() {
-		try {
-			// Generate random key
-			String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-			SecureRandom random = new SecureRandom();
-			StringBuilder key = new StringBuilder();
-			for (int i = 0; i < 12; i++)
-				key.append(chars.charAt(random.nextInt(chars.length())));
-
-			URL url = new URL(files[0].full_url);
-
-			// Build share API URL (base URL without file path)
-			String shareApiUrl = url.getProtocol() + "://" + url.getHost();
-			if (url.getPort() != -1)
-				shareApiUrl += ":" + url.getPort();
-			shareApiUrl += "/?share";
-
-			// Get expiration
-			EditText expField = findViewById(R.id.share_expiration);
-			String expValue = expField.getText().toString();
-			int[] parsed = parseExpiration(expValue);
-			String expiration = "";
-			if (parsed[1] >= 0) {
-				int minutes = parsed[0];
-				if (parsed[1] == 1)
-					minutes *= 60;
-				else if (parsed[1] == 2)
-					minutes *= 1440;
-				expiration = String.valueOf(minutes);
-			}
-
-			// Get password
-			EditText pwField = findViewById(R.id.share_password);
-			String sharePw = pwField.getText().toString();
-
-			StringBuilder sharedFilesPaths = new StringBuilder();
-			for (int i = 0; i < files.length; i++) {
-				String filePath = java.net.URLDecoder.decode(new URL(files[i].full_url).getPath(), "UTF-8");
-				sharedFilesPaths.append("\"").append(filePath).append("\"");
-				if (i < files.length - 1) {
-					sharedFilesPaths.append(",");
-				}
-			}
-
-			// Build JSON body
-			String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
-					key.toString(), sharedFilesPaths, sharePw, expiration);
-
-			URL apiUrl = new URL(shareApiUrl);
-			HttpURLConnection conn = (HttpURLConnection) apiUrl.openConnection();
-			conn.setDoOutput(true);
-			conn.setRequestMethod("POST");
-			conn.setRequestProperty("Content-Type", "text/plain");
-			if (password != null)
-				conn.setRequestProperty("PW", password);
-
-			byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
-			conn.setFixedLengthStreamingMode(body.length);
-			conn.connect();
-
-			OutputStream os = conn.getOutputStream();
-			os.write(body);
-			os.flush();
-
-			int rc = conn.getResponseCode();
-			if (rc >= 300) {
-				Log.w("me.ocv.partyup", "Share creation failed: " + rc);
-				conn.disconnect();
-				return;
-			}
-
-			BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-			String response = br.readLine();
-			conn.disconnect();
-
-			// Parse response: "created share: https://..."
-			if (response != null && response.startsWith("created share: "))
-				share_url = response.substring(15);
-
-		} catch (Exception ex) {
-			Log.w("me.ocv.partyup", "Share creation error: " + ex.toString());
-		}
-	}
-
-	void onsuccess() {
+	private void onsuccess() {
 		String msg = "✅👍\n\nCompleted successfully";
-		if (files != null) {
-			if (files.length == 1 && share_url == null) {
-				msg += "\n\n" + files[0].share_url;
-			} else if (share_url != null) {
-				msg += "\n\n" + share_url;
-			} else {
-				msg += "\n\n" + files.length + " files OK";
-			}
-		}
-		show_msg(msg);
+		final String share_url = createShareUrl();
+		String footer = String.format("Total file uploaded: %d (%.1f MB)", files.length,
+				progress.total / (1024.0 * 1024.0));
+
+		show_msg(String.join("\n", msg, share_url, footer));
 		((TextView) findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
+		if (share_url.isEmpty()) {
+			Toast.makeText(
+					getApplicationContext(),
+					"Share Failed!",
+					Toast.LENGTH_SHORT).show();
+			return;
+		} else {
+			Toast.makeText(
+					getApplicationContext(),
+					"Can Share!",
+					Toast.LENGTH_SHORT).show();
+		}
 
 		String act = prefs.getString("on_up_ok", "menu");
 		if (act != null && !act.equals("menu")) {
 			if (act.equals("copy"))
-				copylink();
+				copylink(share_url);
 			else if (act.equals("share"))
-				sharelink();
+				sharelink(share_url);
 			else
-				Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
+				Toast.makeText(getApplicationContext(), "Upload OK",
+						Toast.LENGTH_SHORT).show();
 
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
 				finishAndRemoveTask();
@@ -464,114 +418,150 @@ public class XferActivity extends AppCompatActivity {
 		Button vcopy = (Button) findViewById(R.id.btnCopyLink);
 		Button vqrcode = (Button) findViewById(R.id.btnQrCode);
 		Button vshare = (Button) findViewById(R.id.btnShareLink);
-		if (files == null) {
-			vcopy.setVisibility(View.GONE);
-			vshare.setVisibility(View.GONE);
-			vqrcode.setVisibility(View.GONE);
-			return;
-		}
 
-		vcopy.setOnClickListener(v -> copylink());
-		vshare.setOnClickListener(v -> sharelink());
-		vqrcode.setOnClickListener(view -> showQr());
-		if (files.length > 1 && share_url == null) {
-			vshare.setVisibility(View.GONE);
-			vqrcode.setVisibility(View.GONE);
-		}
+		vcopy.setOnClickListener(v -> copylink(share_url));
+		vshare.setOnClickListener(v -> sharelink(share_url));
+		vqrcode.setOnClickListener(view -> showQr(share_url));
 	}
 
-	void copylink() {
-		if (files == null)
-			return;
+	private CustomFile[] getWantedFiles() {
+		ArrayList<CustomFile> needed = new ArrayList<>();
 
-		String links = "";
+		for (CustomFile file : files) {
+			if (file.isSharable())
+				needed.add(file);
+		}
 
-		if (share_url != null) {
-			links = share_url;
-		} else {
-			for (CustomFile file : files)
-				links += file.share_url + "\n";
+		return needed.toArray(new CustomFile[0]);
+	}
+
+	private String createShareUrl() {
+		try {
+
+			CustomFile[] wantedFiles = getWantedFiles();
+
+			if (wantedFiles.length == 0) {
+				// It means no valid files were found and if there are files then they are
+				// mostly text ( aka links )
+				throw new Exception();
+			} else if ((files.length - wantedFiles.length) < 2) {
+				// Too low files
+				for (CustomFile file : wantedFiles) {
+					String bestUrl = file.getBestUrl();
+					if (bestUrl.isEmpty())
+						continue;
+					return bestUrl;
+				}
+				throw new Exception("Man don't know!");
+			}
+
+			String key = generateRandomKey(12);
+			Uri shareApiUri = Uri.parse(uploader.getServerUrl());
+
+			String expiration = getExpiration();
+			// Get password
+			EditText pwField = findViewById(R.id.share_password);
+			String sharePw = pwField.getText().toString();
+
+			StringBuilder sharedFilesPaths = new StringBuilder();
+
+			// "/File_path","/File_path/2"
+			for (int i = 0; i < wantedFiles.length; i++) {
+				CustomFile cf = wantedFiles[i];
+				String filePath = java.net.URLDecoder.decode(new URL(cf.full_url).getPath(), "UTF-8");
+
+				sharedFilesPaths.append("\"").append(filePath).append("\"");
+				if (i < files.length - 1) {
+					sharedFilesPaths.append(",");
+				}
+			}
+
+			if (sharedFilesPaths != null && sharedFilesPaths.length() == 0) {
+				throw new Exception("No media/file type found in shared items");
+			}
+
+			return getSharableUrl(key, sharedFilesPaths, sharePw, expiration, shareApiUri);
+		} catch (Exception ex) {
+			Log.w("me.ocv.partyup", "Share creation error: " + ex.toString());
+		}
+
+		return "";
+	}
+
+	void copylink(String share_url) {
+		StringBuilder sb = new StringBuilder();
+
+		if (!share_url.isEmpty())
+			sb.append(share_url);
+
+		for (CustomFile file : files) {
+			String bestUrl = file.getBestUrl();
+			if (file.getBestUrl().isEmpty())
+				continue;
+			sb.append(bestUrl);
 		}
 
 		ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-		ClipData cd = ClipData.newPlainText("copyparty upload", links);
+		ClipData cd = ClipData.newPlainText("copyparty upload", sb);
 		cb.setPrimaryClip(cd);
-		Toast.makeText(getApplicationContext(), "Upload OK -- Link copied", Toast.LENGTH_SHORT).show();
+		Toast.makeText(getApplicationContext(), "Upload OK -- Link copied",
+				Toast.LENGTH_SHORT).show();
 	}
 
-	void sharelink() {
-		if (files == null)
-			return;
-
-		String link_to_share;
-
-		if (share_url != null) {
-			link_to_share = share_url;
-		} else if (files.length > 1) {
-			return;
-		} else {
-			link_to_share = files[0].share_url;
-		}
-
+	private void sharelink(String share_url) {
 		Intent send = new Intent(Intent.ACTION_SEND);
 		send.setType("text/plain");
 		send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 		send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
-		send.putExtra(Intent.EXTRA_TEXT, link_to_share);
+		send.putExtra(Intent.EXTRA_TEXT, share_url);
 		// startActivity(Intent.createChooser(send, "Share file link"));
 
 		Intent view = new Intent(Intent.ACTION_VIEW);
-		view.setData(Uri.parse(link_to_share));
+		view.setData(Uri.parse(share_url));
 
 		Intent i = Intent.createChooser(send, "Share file link");
 		i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[] { view });
 		startActivity(i);
 	}
 
-	void showQr() {
-		if (share_qr == null) {
-			String url_to_share;
-			if (share_url != null)
-				url_to_share = share_url;
-			else
-				url_to_share = files[0].full_url;
+	private void showQr(String share_url) {
+		try {
+			QRCodeWriter qrCodeWriter = new QRCodeWriter();
+			int size = 256;
+			BitMatrix bitMatrix = qrCodeWriter.encode(share_url,
+					BarcodeFormat.QR_CODE, size, size);
 
-			try {
-				QRCodeWriter qrCodeWriter = new QRCodeWriter();
-				int size = 256;
-				BitMatrix bitMatrix = qrCodeWriter.encode(url_to_share, BarcodeFormat.QR_CODE, size, size);
+			Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
 
-				Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
-
-				for (int x = 0; x < size; x++) {
-					for (int y = 0; y < size; y++) {
-						bitmap.setPixel(x, y,
-								bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
-					}
+			for (int x = 0; x < size; x++) {
+				for (int y = 0; y < size; y++) {
+					bitmap.setPixel(x, y,
+							bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
 				}
-
-				share_qr = bitmap;
-
-			} catch (WriterException e) {
-				throw new RuntimeException(e);
 			}
+
+			Bitmap share_qr = bitmap;
+			AlertDialog.Builder ImageDialog = new AlertDialog.Builder(XferActivity.this);
+			ImageView shownImage = new ImageView(XferActivity.this);
+			shownImage.setImageBitmap(share_qr);
+			shownImage.setLayoutParams(
+					new ViewGroup.LayoutParams(
+							ViewGroup.LayoutParams.MATCH_PARENT,
+							ViewGroup.LayoutParams.WRAP_CONTENT));
+			shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+			shownImage.setAdjustViewBounds(true);
+
+			ImageDialog.setView(shownImage);
+
+			ImageDialog.show();
+		} catch (WriterException e) {
+			throw new RuntimeException(e);
 		}
-		AlertDialog.Builder ImageDialog = new AlertDialog.Builder(XferActivity.this);
-		ImageView shownImage = new ImageView(XferActivity.this);
-		shownImage.setImageBitmap(share_qr);
-		shownImage.setLayoutParams(new ViewGroup.LayoutParams(
-				ViewGroup.LayoutParams.MATCH_PARENT,
-				ViewGroup.LayoutParams.WRAP_CONTENT));
-		shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-		shownImage.setAdjustViewBounds(true);
-
-		ImageDialog.setView(shownImage);
-
-		ImageDialog.show();
 	}
 
-	void need_storage(String exmsg) {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && exmsg.contains("EACCES")) {
+	private void need_storage(String exmsg) {
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+				exmsg.contains("EACCES")) {
 			show_msg(exmsg + "\n\nThe app you shared from uses deprecated file APIs.");
 			return;
 		}
@@ -592,7 +582,8 @@ public class XferActivity extends AppCompatActivity {
 
 		AlertDialog.Builder ab = new AlertDialog.Builder(findViewById(R.id.upper_info).getContext());
 		ab.setMessage(
-				"PartyUP! needs additional permissions to read that file, because the app you shared it from is using old APIs.")
+				"PartyUP! needs additional permissions to read that file, because the app you"
+						+ "shared it from is using old APIs.")
 				.setPositiveButton("OK", new DialogInterface.OnClickListener() {
 					@Override
 					public void onClick(DialogInterface dialog, int which) {
@@ -606,13 +597,70 @@ public class XferActivity extends AppCompatActivity {
 				}).show();
 	}
 
+	private String getSharableUrl(
+			String key,
+			StringBuilder sharedFilesPaths,
+			String sharePw,
+			String expiration,
+			Uri shareApiUri) throws Exception {
+
+		// Build JSON body
+		// {
+		// "k": "key",
+		// "vp": [
+		// "/File_path",
+		// "/File_path/1"
+		// ],
+		// "pw": "sharePw",
+		// "exp": "expiration",
+		// "perms": ["read"]
+		// }
+		String jsonBody = String.format(
+				"{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
+				key, sharedFilesPaths, sharePw, expiration);
+
+		HttpURLConnection conn = (HttpURLConnection) (new URL(
+				shareApiUri.getScheme() + "://" + shareApiUri.getAuthority() + "/")).openConnection();
+		conn.setDoOutput(true);
+		conn.setRequestMethod("POST");
+		conn.setRequestProperty("Content-Type", "text/plain");
+		if (password != null)
+			conn.setRequestProperty("PW", password);
+
+		byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
+		conn.setFixedLengthStreamingMode(body.length);
+		conn.connect();
+
+		OutputStream os = conn.getOutputStream();
+		os.write(body);
+		os.flush();
+
+		int rc = conn.getResponseCode();
+		if (rc >= 300) {
+			Log.w("me.ocv.partyup", "Share creation failed: " + rc);
+			conn.disconnect();
+			throw new RuntimeException("Unable to get share url!");
+		}
+
+		BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+		String response = br.readLine();
+		conn.disconnect();
+
+		// Parse response: "created share: https://..."
+		if (response != null && response.startsWith("created share: "))
+			return response.substring(15);
+
+		return "";
+	}
+
 	void request_storage() {
 		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
 		requestPermissions(new String[] { perm }, 573);
 	}
 
 	@Override
-	public void onRequestPermissionsResult(int permRequestCode, String perms[], int[] grantRes) {
+	public void onRequestPermissionsResult(int permRequestCode, String perms[],
+			int[] grantRes) {
 		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
 		if (permRequestCode != 573)
 			return;
@@ -624,6 +672,24 @@ public class XferActivity extends AppCompatActivity {
 			if (grantRes[a] != PackageManager.PERMISSION_GRANTED)
 				return;
 		}
+	}
+
+	private String getExpiration() {
+		// Get expiration
+		EditText expField = findViewById(R.id.share_expiration);
+		String expValue = expField.getText().toString();
+		int[] parsed = parseExpiration(expValue);
+		String expiration = "";
+		if (parsed[1] >= 0) {
+			int minutes = parsed[0];
+			if (parsed[1] == 1)
+				minutes *= 60;
+			else if (parsed[1] == 2)
+				minutes *= 1440;
+			expiration = String.valueOf(minutes);
+		}
+
+		return expiration;
 	}
 
 	int[] parseExpiration(String value) {
@@ -692,6 +758,16 @@ public class XferActivity extends AppCompatActivity {
 			default:
 				return "never expires";
 		}
+	}
+
+	private String generateRandomKey(int size) {
+		// Generate random key
+		String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+		SecureRandom random = new SecureRandom();
+		StringBuilder key = new StringBuilder();
+		for (int i = 0; i < 12; i++)
+			key.append(chars.charAt(random.nextInt(chars.length())));
+		return key.toString();
 	}
 
 }
