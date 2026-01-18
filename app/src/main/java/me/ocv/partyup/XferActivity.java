@@ -58,6 +58,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
+import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.function.Consumer;
 
@@ -142,8 +143,28 @@ class Progress {
 	}
 
 	public String stats() {
-		String format = String.join("\n", "Bytes: %d/%d (%d)", "Percentage: %.2f", "Speed: %.2f MB/s", "ETA: %d sec");
-		return String.format(format, done, total, left(), perc() * 100, speed() / (1024.0 * 1024.0), eta());
+		String format = String.join("\n", "Bytes: %d/%d (%d)", "Percentage: %.2f", "Speed: %s", "ETA: %d sec");
+		return String.format(format, done, total, left(), perc() * 100, formatBytes((long) speed()), eta());
+	}
+
+	public static String formatBytes(Long bytes) {
+		if (bytes == null)
+			return "0 B";
+
+		if (bytes < 1024) {
+			return bytes + " B";
+		}
+
+		final String[] units = { "KB", "MB", "GB", "TB", "PB" };
+		double value = bytes;
+		int unit = -1;
+
+		do {
+			value /= 1024;
+			unit++;
+		} while (value >= 1024 && unit < units.length - 1);
+
+		return String.format(Locale.US, "%.2f %s", value, units[unit]);
 	}
 }
 
@@ -191,7 +212,7 @@ public class XferActivity extends AppCompatActivity {
 
 		// Looping over all prepared files, can do additional work here
 		for (CustomFile cf : files) {
-			if (cf.size > 0) {
+			if (cf.size != null && cf.size > 0) {
 				progress.total += cf.size;
 			}
 		}
@@ -218,7 +239,7 @@ public class XferActivity extends AppCompatActivity {
 	}
 
 	private String getTextBody() {
-		String messages = "";
+		StringJoiner messages = new StringJoiner("\n");
 
 		int counter = 1;
 		for (int i = 0; i < files.length; i++) {
@@ -226,20 +247,20 @@ public class XferActivity extends AppCompatActivity {
 				break;
 
 			CustomFile cf = files[i];
-			if (cf.mime.equals("text/plain") || cf.content == null)
+			if (!cf.mime.equals("text/plain") || cf.content == null)
 				continue;
 
-			messages = messages.concat(String.format("%d. %s" + (counter < 10 ? "\n" : ""), counter, cf.content));
+			messages.add(String.format("%d. %s", counter, cf.content.trim()));
 			counter++;
 		}
 
 		String header = String.format("Post%s the following link%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "",
 				autosend ? ":" : "?");
-		return counter == 1 ? "" : String.join("\n\n", header, messages, counter > 10 ? "[...]" : "");
+		return counter == 1 ? "" : String.join("\n\n", header, messages.toString(), counter > 10 ? "[...]" : "");
 	}
 
 	private String getFileBody() {
-		String filenames = "";
+		StringJoiner filenames = new StringJoiner("\n");
 		int counter = 1;
 		for (int i = 0; i < files.length; i++) {
 			if (counter > 10)
@@ -249,18 +270,13 @@ public class XferActivity extends AppCompatActivity {
 			if (file.mime.equals("text/plain") || file.size == null)
 				continue;
 
-			filenames = filenames.concat(
-					String.format(
-							"%d. %s [%.1fMB]" + (counter < 10 ? "\n" : ""),
-							counter,
-							file.name,
-							file.size < 0 ? 0.0 : file.size / (1024 * 1024)));
+			filenames.add(String.format("%d. %s [%s]", counter, file.name, progress.formatBytes(file.size)));
 			counter++;
 		}
 
 		String header = String.format("Upload%s the following file%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "",
 				autosend ? ":" : "?");
-		return counter == 1 ? "" : String.join("\n\n", header, filenames, counter > 10 ? "[...]" : "");
+		return counter == 1 ? "" : String.join("\n\n", header, filenames.toString(), counter > 10 ? "[...]" : "");
 	}
 
 	private void showShareSettings() {
@@ -285,7 +301,7 @@ public class XferActivity extends AppCompatActivity {
 				(!autosend ? "Press the button to upload!" : "Starting..."));
 		String footer = String.join("\n",
 				String.format("Total files: %d", files.length),
-				String.format("Total size: %.2fMB", progress.total < 0 ? 0.0 : progress.total / (1024.0 * 1024.0)));
+				String.format("Total size: %s", progress.formatBytes(progress.total)));
 
 		String fullBody = String.join("\n\n", header, body, footer);
 		show_msg(fullBody);
@@ -302,13 +318,15 @@ public class XferActivity extends AppCompatActivity {
 	private void do_up2() {
 		try {
 			progress.t0 = System.currentTimeMillis();
+
 			final TextView tv = (TextView) findViewById(R.id.upper_info);
 			final ProgressBar pb = (ProgressBar) findViewById(R.id.progbar);
 
 			class ProgressStats {
-				public long done;
-				public int nfile;
-				public int total_file;
+				// Set default so doesn't freaks out
+				public long done = 0;
+				public int nfile = 0;
+				public int total_file = files.length;
 			}
 
 			final Consumer<ProgressStats> onProgress = (ps) -> {
@@ -366,8 +384,8 @@ public class XferActivity extends AppCompatActivity {
 	private void onsuccess() {
 		String msg = "✅👍\n\nCompleted successfully";
 		final String share_url = createShareUrl();
-		String footer = String.format("Total file uploaded: %d (%.1f MB)", files.length,
-				progress.total / (1024.0 * 1024.0));
+		String footer = String.format("Total file uploaded: %d (%s)", files.length,
+				progress.formatBytes(progress.total));
 
 		show_msg(String.join("\n", msg, share_url, footer));
 		((TextView) findViewById(R.id.upper_info)).setGravity(Gravity.CENTER);
@@ -377,11 +395,6 @@ public class XferActivity extends AppCompatActivity {
 					"Share Failed!",
 					Toast.LENGTH_SHORT).show();
 			return;
-		} else {
-			Toast.makeText(
-					getApplicationContext(),
-					"Can Share!",
-					Toast.LENGTH_SHORT).show();
 		}
 
 		String act = prefs.getString("on_up_ok", "menu");
@@ -443,7 +456,7 @@ public class XferActivity extends AppCompatActivity {
 			if (wantedFiles.length == 0) {
 				// It means no valid files were found and if there are files then they are
 				// mostly text ( aka links )
-				throw new Exception();
+				return files[0].share_url;
 			} else if ((files.length - wantedFiles.length) < 2) {
 				// Too low files
 				for (CustomFile file : wantedFiles) {

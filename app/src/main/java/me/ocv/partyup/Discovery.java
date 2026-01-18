@@ -53,6 +53,7 @@ public class Discovery {
 		}
 
 		if (handles != null) {
+			// 'handles' non text files
 			for (Uri uri : handles) {
 				CustomFile cf = new CustomFile();
 				cf.handle = uri;
@@ -64,13 +65,16 @@ public class Discovery {
 				files.add(cf);
 			}
 		} else if (the_msg != null) {
+			// only text files
 			CustomFile cf = new CustomFile();
 			cf.content = the_msg;
 			cf.mime = "text/plain";
+			cf.size = (long) the_msg.length();
+
 			files.add(cf);
 		} else {
 			this.onError.accept(
-					"cannot decide on what to send for " + intent.getType());
+					"Cannot decide on what to send for " + intent.getType());
 		}
 
 		return files.toArray(new CustomFile[0]);
@@ -106,6 +110,8 @@ public class Discovery {
 	}
 
 	private void parseFile(CustomFile cf) {
+		// This fn doesn't parse files that is only text (aka share on selected text)
+		// mime is set above
 		cf.ext = getext(cf.mime);
 
 		if ("file".equals(cf.handle.getScheme())) {

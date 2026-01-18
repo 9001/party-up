@@ -3,6 +3,7 @@ package me.ocv.partyup;
 import me.ocv.partyup.XferActivity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -49,6 +50,11 @@ public class Uploader {
 	private Context context;
 
 	private boolean uploadFile(CustomFile cf, HttpURLConnection conn) throws Exception {
+		if (cf.size == null || cf.size == 0) {
+			Log.e("Uploader", String.format("Bad media file: %s", cf));
+			conn.disconnect();
+			return false;
+		}
 		Log.d("Uploader", String.format("Identified '%s' as a file (%s) with size: %d", cf.name, cf.mime, cf.size));
 
 		conn.setRequestMethod("PUT");
@@ -79,6 +85,7 @@ public class Uploader {
 			up.delta = n;
 			up.done += n;
 			this.onProgress.accept(up);
+			Log.d("Uploader", String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
 		}
 
 		os.flush();
@@ -94,25 +101,33 @@ public class Uploader {
 
 	private boolean uploadText(CustomFile cf, HttpURLConnection conn) throws Exception {
 		if (cf.content == null) {
+			Log.e("Uploader", String.format("Bad text file: %s", cf));
 			conn.disconnect();
 			return false;
 		}
 
-		byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8")).getBytes(StandardCharsets.UTF_8);
+		Log.d("Uploader", "Creating body...");
+
+		byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8"))
+				.getBytes(StandardCharsets.UTF_8);
+
 		conn.setRequestMethod("POST");
-		conn.setFixedLengthStreamingMode(body.length);
 		conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
 		conn.connect();
 
-		OutputStream os = conn.getOutputStream();
-		os.write(body);
-		os.flush();
+		this.onInit.run();
+		Log.d("Uploader", "[POST] Body creation successful: " + body.length);
 
 		UploadProgress up = new UploadProgress();
 		up.delta = (long) body.length;
 		up.total = (long) body.length;
 		up.done = (long) body.length;
 
+		Log.d("Uploader", String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
+
+		OutputStream os = conn.getOutputStream();
+		os.write(body);
+		os.flush();
 		this.onProgress.accept(up);
 
 		int rc = conn.getResponseCode();
@@ -122,6 +137,13 @@ public class Uploader {
 			return false;
 		}
 
+		String[] serverResponse = readServerResponse(conn);
+		if (serverResponse != null && serverResponse.length > 0) {
+			cf.share_url = String.join("\n", serverResponse).trim();
+		} else {
+			cf.share_url = "Server not happy!";
+		}
+
 		return true;
 	}
 
@@ -129,11 +151,12 @@ public class Uploader {
 		HttpURLConnection conn = makeConnection(cf);
 		cf.full_url = conn.getURL().toString();
 
+		Log.d("Uploader", String.format("Uploading started of file: %s", cf));
 		boolean uploadSuccess = false;
 
 		if (cf.mime.equals("text/plain")) {
-			uploadSuccess = this.uploadText(cf, conn);
 			// Text (aka links) Upload POST
+			uploadSuccess = this.uploadText(cf, conn);
 		} else {
 			// Files Upload PUT
 			uploadSuccess = this.uploadFile(cf, conn);
@@ -142,6 +165,7 @@ public class Uploader {
 		if (uploadSuccess)
 			this.onComplete.run();
 
+		Log.i("Uploader", String.format("Uploader result: %s", uploadSuccess));
 		conn.disconnect();
 		return uploadSuccess;
 	}
