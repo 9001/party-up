@@ -1,5 +1,6 @@
 package me.ocv.partyup;
 
+// The imports are kinda messie
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
@@ -666,7 +667,7 @@ public class XferActivity extends AppCompatActivity {
 		return "";
 	}
 
-	void request_storage() {
+	private void request_storage() {
 		String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
 		requestPermissions(new String[] { perm }, 573);
 	}
@@ -705,7 +706,7 @@ public class XferActivity extends AppCompatActivity {
 		return expiration;
 	}
 
-	int[] parseExpiration(String value) {
+	private int[] parseExpiration(String value) {
 		// Returns [number, unit] where unit: 0=minutes, 1=hours, 2=days,
 		// -1=invalid/empty
 		if (value == null || value.trim().isEmpty())
@@ -739,7 +740,7 @@ public class XferActivity extends AppCompatActivity {
 		return new int[] { num, unitType };
 	}
 
-	String getExpirationMinutes() {
+	private String getExpirationMinutes() {
 		String value = prefs.getString("link_expiration", "");
 		int[] parsed = parseExpiration(value);
 		if (parsed[1] < 0)
@@ -754,7 +755,7 @@ public class XferActivity extends AppCompatActivity {
 		return String.valueOf(minutes);
 	}
 
-	String getExpirationLabel() {
+	private String getExpirationLabel() {
 		String value = prefs.getString("link_expiration", "");
 		int[] parsed = parseExpiration(value);
 		if (parsed[1] < 0)
