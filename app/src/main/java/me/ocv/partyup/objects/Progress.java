@@ -48,7 +48,7 @@ public class Progress {
     }
 
     public int perc() {
-        return (int) ratio() * 100;
+        return (int) Math.round(ratio() * 100.0);
     }
 
     public double speed() {
@@ -66,8 +66,8 @@ public class Progress {
     }
 
     public String stats() {
-        String format = String.join("\n", "Bytes: %d/%d (%d)", "Percentage: %.2f", "Speed: %s", "ETA: %d sec");
-        return String.format(Locale.getDefault(), format, done, total, left(), perc() * 100, formatBytes((long) speed()), eta());
+        String format = String.join("\n", "Bytes: %d/%d (%d)", "Percentage: %.1f%%", "Speed: %s", "ETA: %d sec");
+        return String.format(Locale.getDefault(), format, done, total, left(), ratio() * 100.0, formatBytes((long) speed()), eta());
     }
 }
 

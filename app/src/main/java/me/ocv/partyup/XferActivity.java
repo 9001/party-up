@@ -268,8 +268,8 @@ public class XferActivity extends AppCompatActivity {
         binding.btnExit.setOnClickListener(v -> finishAndRemoveTask());
 
         binding.btnCopyLink.setOnClickListener(v -> copyLink(share_url));
-        binding.btnQrCode.setOnClickListener(v -> shareLink(share_url));
-        binding.btnShareLink.setOnClickListener(view -> showQr(share_url));
+        binding.btnShareLink.setOnClickListener(v -> shareLink(share_url));
+        binding.btnQrCode.setOnClickListener(view -> showQr(share_url));
     }
 
     private void copyLink(@NonNull String share_url) {
