@@ -17,14 +17,14 @@ android {
 
     defaultConfig {
         applicationId "me.ocv.partyup"
-        minSdk 26
+        minSdk 24
         targetSdk 34
         versionCode 10900
         versionName "1.9.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         signingConfig signingConfigs.release
-        minSdkVersion 26
+        minSdkVersion 24
         targetSdkVersion 34
     }
 

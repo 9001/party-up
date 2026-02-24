@@ -1,4 +1,4 @@
-package me.ocv.partyup;
+package me.ocv.partyup.utils;
 
 import android.util.Base64;
 import android.content.Context;
@@ -11,7 +11,10 @@ import android.util.Log;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.function.Consumer;
+
+import me.ocv.partyup.objects.CustomFile;
 
 public class Discovery {
 	private Context context;
@@ -27,14 +30,14 @@ public class Discovery {
 		ArrayList<CustomFile> files = new ArrayList<>();
 		String the_msg = null;
 
-		String etype = intent.getType();
+		String eType = intent.getType();
 		String action = intent.getAction();
 		boolean one = Intent.ACTION_SEND.equals(action);
 		boolean many = Intent.ACTION_SEND_MULTIPLE.equals(action);
 
-		if (etype == null || (!one && !many)) {
+		if (eType == null || (!one && !many)) {
 			this.onError.accept(
-					"cannot share content;\naction: " + action + "\ntype: " + etype);
+					"cannot share content;\naction: " + action + "\ntype: " + eType);
 			return files.toArray(new CustomFile[0]);
 		}
 
@@ -57,7 +60,7 @@ public class Discovery {
 			for (Uri uri : handles) {
 				CustomFile cf = new CustomFile();
 				cf.handle = uri;
-				cf.mime = etype;
+				cf.mime = eType;
 				parseFile(cf);
 				
 				if (cf.size == null) continue;	
@@ -80,7 +83,7 @@ public class Discovery {
 		return files.toArray(new CustomFile[0]);
 	}
 
-	private String getext(String mime) {
+	private String getExt(String mime) {
 		if (mime == null)
 			return "bin";
 
@@ -112,7 +115,7 @@ public class Discovery {
 	private void parseFile(CustomFile cf) {
 		// This fn doesn't parse files that is only text (aka share on selected text)
 		// mime is set above
-		cf.ext = getext(cf.mime);
+		cf.ext = getExt(cf.mime);
 
 		if ("file".equals(cf.handle.getScheme())) {
 			String path = cf.handle.getPath();
@@ -120,31 +123,26 @@ public class Discovery {
 					? path.substring(path.lastIndexOf('/') + 1)
 					: "file";
 		} else {
-			Cursor cur = null;
-			try {
-				cur = this.context.getContentResolver().query(
-						cf.handle,
-						new String[] {
-								OpenableColumns.DISPLAY_NAME,
-								OpenableColumns.SIZE
-						},
-						null, null, null);
+            try (Cursor cur = this.context.getContentResolver().query(
+                    cf.handle,
+                    new String[]{
+                            OpenableColumns.DISPLAY_NAME,
+                            OpenableColumns.SIZE
+                    },
+                    null, null, null)) {
 
-				if (cur != null && cur.moveToFirst()) {
-					int iname = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-					int isize = cur.getColumnIndex(OpenableColumns.SIZE);
+                if (cur != null && cur.moveToFirst()) {
+                    int iName = cur.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    int iSize = cur.getColumnIndex(OpenableColumns.SIZE);
 
-					if (iname != -1)
-						cf.name = cur.getString(iname);
-					if (isize != -1)
-						cf.size = cur.getLong(isize);
-				}
-			} catch (Exception ex) {
-				Log.w("Discovery", "contentresolver: " + ex);
-			} finally {
-				if (cur != null)
-					cur.close();
-			}
+                    if (iName != -1)
+                        cf.name = cur.getString(iName);
+                    if (iSize != -1)
+                        cf.size = cur.getLong(iSize);
+                }
+            } catch (Exception ex) {
+                Log.w("Discovery", "Content Resolver: " + ex);
+            }
 		}
 
 		MessageDigest md = null;
@@ -157,9 +155,8 @@ public class Discovery {
 			}
 		}
 
-		// get correct filesize
-		try {
-			InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
+		// get correct file size
+		try (InputStream ins = this.context.getContentResolver().openInputStream(cf.handle)) {
 			assert ins != null;
 			byte[] buf = new byte[128 * 1024];
 			long sz = 0;
@@ -175,18 +172,18 @@ public class Discovery {
 			cf.size = sz;
 		} catch (Exception ex) {
 			this.onError.accept("StoragePermissionNeeded");
-			String exmsg = "Error3: " + ex.toString();
-			this.onError.accept("StoragePermissionNeeded: " + exmsg);
+			String exMsg = "Error3: " + ex;
+			this.onError.accept("StoragePermissionNeeded: " + exMsg);
 			return;
 		}
 
 		if (md != null) {
-			String csum = Base64.encodeToString(md.digest(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP)
+			String cSum = Base64.encodeToString(md.digest(), Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP)
 					.substring(0, 15);
-			cf.name = String.format("mystery-file-%s.%s", csum, cf.ext);
+			cf.name = String.format("mystery-file-%s.%s", cSum, cf.ext);
 		}
 
-		cf.desc = String.format(
+		cf.desc = String.format(Locale.getDefault(),
 				"%s\n\nsize: %,d byte\ntype: %s",
 				cf.name,
 				cf.size,

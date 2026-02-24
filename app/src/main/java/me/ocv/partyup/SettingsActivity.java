@@ -2,14 +2,14 @@ package me.ocv.partyup;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import android.widget.Toast;
 
+import androidx.preference.PreferenceManager;
 import androidx.preference.EditTextPreference;
 import androidx.preference.PreferenceFragmentCompat;
 
@@ -33,7 +33,7 @@ public class SettingsActivity extends AppCompatActivity {
         if (prefs.getString("on_up_ok", "menu").equals("menu")) {
             SharedPreferences.Editor ed = prefs.edit();
             ed.putString("on_up_ok", "menu");
-            ed.commit();
+            ed.apply();
         }
     }
 
@@ -42,9 +42,9 @@ public class SettingsActivity extends AppCompatActivity {
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
-            EditTextPreference surl = findPreference("server_url");
-            if (surl != null) {
-                surl.setDialogMessage("to upload into a folder, add the folder at the end of the URL, for example “https://ask.com/foo/bar/”\n\nExample: “https://ask.com/%Y/%m/” will create\n“/Year/month/” (%Y/%m/%d, %H:%M:%S)");
+            EditTextPreference sUrl = findPreference("server_url");
+            if (sUrl != null) {
+                sUrl.setDialogMessage("to upload into a folder, add the folder at the end of the URL, for example “https://ask.com/foo/bar/”\n\nExample: “https://ask.com/%Y/%m/” will create\n“/Year/month/” (%Y/%m/%d, %H:%M:%S)");
             }
 
             EditTextPreference passwd = findPreference("server_password");

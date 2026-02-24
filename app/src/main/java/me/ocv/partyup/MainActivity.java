@@ -4,19 +4,19 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Build;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
-import android.view.View;
-import android.widget.Button;
-import android.widget.TextView;
+
+import me.ocv.partyup.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+
+        ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
+        setContentView(binding.getRoot());
 
         String txt = "<p><em>Hello from <a href=\"https://github.com/9001/party-up\">Party UP!</a> <b>version " + BuildConfig.VERSION_NAME + "</b></em></p>" +
                 "<p>This app lets you upload files (images, videos) to a <a href=\"https://github.com/9001/copyparty#quickstart\">copyparty</a> server.</p>" +
@@ -25,22 +25,11 @@ public class MainActivity extends AppCompatActivity {
                 "<p>You can also share things like youtube videos; the app will then upload a message with the link. The copyparty server can be configured to log these for later viewing.</p>" +
                 "<p>Funfact: You can run the copyparty server itself on any device where Python is available -- and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>";
 
-        TextView tv = ((TextView)findViewById(R.id.textView4));
+        binding.textView4.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+        binding.textView4.setMovementMethod(LinkMovementMethod.getInstance());
 
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-			tv.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
-		} else {
-			tv.setText(Html.fromHtml(txt));
-		}
-
-        tv.setMovementMethod(LinkMovementMethod.getInstance());
-
-        ((Button)findViewById(R.id.settingsBtn)).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent i = new Intent(MainActivity.this, SettingsActivity.class);
-                startActivity(i);
-            }
+        binding.settingsBtn.setOnClickListener(v -> {
+            startActivity(new Intent(this, SettingsActivity.class));
         });
     }
 }

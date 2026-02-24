@@ -1,17 +1,13 @@
-package me.ocv.partyup;
-
-import me.ocv.partyup.XferActivity;
+package me.ocv.partyup.utils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.Iterator;
-import java.util.Queue;
 import java.util.function.Consumer;
 import java.net.HttpURLConnection;
+
 import android.net.Uri;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -24,38 +20,31 @@ import java.util.Locale;
 import java.util.TimeZone;
 import android.content.Context;
 
-class UploadProgress {
-	public long delta;
-	public long done;
-	public long total;
-}
+import androidx.annotation.NonNull;
+
+import me.ocv.partyup.objects.CustomFile;
+import me.ocv.partyup.objects.UploadProgress;
+
 
 public class Uploader {
+	private static final String TAG = "Uploader";
 
 	private String serverUrl;
 	private String password;
-	private Consumer<Error> onError = (err) -> {
-		Log.e("Uploader", "Upload error: " + err.toString());
-	};
-	private Consumer<UploadProgress> onProgress = (progress) -> {
-		Log.i("Uploader",
-				String.format("Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
-	};
-	private Runnable onInit = () -> {
-		Log.d("Uploader", "Uploading started!");
-	};
-	private Runnable onComplete = () -> {
-		Log.d("Uploader", "Uploading completed!");
-	};
+	private Consumer<Error> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
+	private Consumer<UploadProgress> onProgress = (progress) -> Log.i(TAG,
+            String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
+	private Runnable onInit = () -> Log.d(TAG, "Uploading started!");
+	private Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
 	private Context context;
 
-	private boolean uploadFile(CustomFile cf, HttpURLConnection conn) throws Exception {
-		if (cf.size == null || cf.size == 0) {
-			Log.e("Uploader", String.format("Bad media file: %s", cf));
+	private boolean uploadFile(@NonNull CustomFile cf, HttpURLConnection conn) throws Exception {
+		if (cf.size == null || cf.size == 0 || cf.handle == null) {
+			Log.e(TAG, String.format("Bad media file: %s", cf));
 			conn.disconnect();
 			return false;
 		}
-		Log.d("Uploader", String.format("Identified '%s' as a file (%s) with size: %d", cf.name, cf.mime, cf.size));
+		Log.d(TAG, String.format("Identified '%s' as a file (%s) with size: %d", cf.name, cf.mime, cf.size));
 
 		conn.setRequestMethod("PUT");
 		conn.setFixedLengthStreamingMode(cf.size);
@@ -64,49 +53,51 @@ public class Uploader {
 		this.onInit.run();
 
 		OutputStream os = conn.getOutputStream();
-		InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
-		MessageDigest md = MessageDigest.getInstance("SHA-512");
+		try (InputStream ins = this.context.getContentResolver().openInputStream(cf.handle)) {
+			if (ins == null) throw new RuntimeException("Input stream is null!");
+			MessageDigest md = MessageDigest.getInstance("SHA-512");
 
-		byte[] buf = new byte[128 * 1024];
+			byte[] buf = new byte[128 * 1024];
 
-		UploadProgress up = new UploadProgress();
-		up.total = cf.size;
-		up.done = 0;
-		up.delta = 0;
+			UploadProgress up = new UploadProgress();
+			up.total = cf.size;
+			up.done = 0;
+			up.delta = 0;
 
-		while (true) {
-			int n = ins.read(buf);
-			if (n == -1)
-				break;
+			while (true) {
+				int n = ins.read(buf);
+				if (n == -1)
+					break;
 
-			os.write(buf, 0, n);
-			md.update(buf, 0, n);
+				os.write(buf, 0, n);
+				md.update(buf, 0, n);
 
-			up.delta = n;
-			up.done += n;
-			this.onProgress.accept(up);
-			Log.d("Uploader", String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
+				up.delta = n;
+				up.done += n;
+				this.onProgress.accept(up);
+				Log.d(TAG, String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
+			}
+
+			os.flush();
+			int rc = conn.getResponseCode();
+			if (rc >= 300) {
+				this.onError.accept(new Error("Server error " + rc + ":\n" +
+						this.read_err(conn)));
+				conn.disconnect();
+				return false;
+			}
+			return uploadSuccess(md, conn, cf);
 		}
+    }
 
-		os.flush();
-		int rc = conn.getResponseCode();
-		if (rc >= 300) {
-			this.onError.accept(new Error("Server error " + rc + ":\n" +
-					this.read_err(conn)));
-			conn.disconnect();
-			return false;
-		}
-		return uploadSuccess(md, conn, cf);
-	}
-
-	private boolean uploadText(CustomFile cf, HttpURLConnection conn) throws Exception {
+	private boolean uploadText(@NonNull CustomFile cf, HttpURLConnection conn) throws Exception {
 		if (cf.content == null) {
-			Log.e("Uploader", String.format("Bad text file: %s", cf));
+			Log.e(TAG, String.format("Bad text file: %s", cf));
 			conn.disconnect();
 			return false;
 		}
 
-		Log.d("Uploader", "Creating body...");
+		Log.d(TAG, "Creating body...");
 
 		byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8"))
 				.getBytes(StandardCharsets.UTF_8);
@@ -116,14 +107,14 @@ public class Uploader {
 		conn.connect();
 
 		this.onInit.run();
-		Log.d("Uploader", "[POST] Body creation successful: " + body.length);
+		Log.d(TAG, "[POST] Body creation successful: " + body.length);
 
 		UploadProgress up = new UploadProgress();
-		up.delta = (long) body.length;
-		up.total = (long) body.length;
-		up.done = (long) body.length;
+		up.delta = body.length;
+		up.total = body.length;
+		up.done = body.length;
 
-		Log.d("Uploader", String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
+		Log.d(TAG, String.format("[Progress] delta, total, done: %d, %d, %d", up.delta, up.total, up.done));
 
 		OutputStream os = conn.getOutputStream();
 		os.write(body);
@@ -138,7 +129,7 @@ public class Uploader {
 		}
 
 		String[] serverResponse = readServerResponse(conn);
-		if (serverResponse != null && serverResponse.length > 0) {
+		if (serverResponse.length > 0) {
 			cf.share_url = String.join("\n", serverResponse).trim();
 		} else {
 			cf.share_url = "Server not happy!";
@@ -151,8 +142,8 @@ public class Uploader {
 		HttpURLConnection conn = makeConnection(cf);
 		cf.full_url = conn.getURL().toString();
 
-		Log.d("Uploader", String.format("Uploading started of file: %s", cf));
-		boolean uploadSuccess = false;
+		Log.d(TAG, String.format("Uploading started of file: %s", cf));
+		boolean uploadSuccess;
 
 		if (cf.mime.equals("text/plain")) {
 			// Text (aka links) Upload POST
@@ -165,12 +156,13 @@ public class Uploader {
 		if (uploadSuccess)
 			this.onComplete.run();
 
-		Log.i("Uploader", String.format("Uploader result: %s", uploadSuccess));
+		Log.i(TAG, String.format("Uploader result: %s", uploadSuccess));
 		conn.disconnect();
 		return uploadSuccess;
 	}
 
-	private HttpURLConnection makeConnection(CustomFile customFile) throws Exception {
+	@NonNull
+	private HttpURLConnection makeConnection(@NonNull CustomFile customFile) throws Exception {
 		String base = serverUrl.endsWith("/") ? serverUrl : serverUrl + "/";
 		String encodedName = customFile.mime.equals("text/plain") ? "" : Uri.encode(customFile.name, "/");
 		String fullUrl = base + encodedName;
@@ -182,10 +174,11 @@ public class Uploader {
 			conn.setRequestProperty("PW", this.password);
 
 		conn.setDoOutput(true);
-		Log.d("Uploader", "Sending to: " + fullUrl);
+		Log.d(TAG, "Sending to: " + fullUrl);
 		return conn;
 	}
 
+	@NonNull
 	private String read_err(HttpURLConnection conn) {
 		try {
 			byte[] buf = new byte[1024];
@@ -196,7 +189,8 @@ public class Uploader {
 		}
 	}
 
-	private String[] readServerResponse(HttpURLConnection conn) throws Exception {
+	@NonNull
+	private String[] readServerResponse(@NonNull HttpURLConnection conn) throws Exception {
 		BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
 
 		ArrayList<String> linesList = new ArrayList<>();
@@ -208,11 +202,11 @@ public class Uploader {
 		return linesList.toArray(new String[0]);
 	}
 
-	private boolean uploadSuccess(MessageDigest md, HttpURLConnection conn, CustomFile cf) throws Exception {
-		String sha = "";
-		byte[] bsha = md.digest();
+	private boolean uploadSuccess(@NonNull MessageDigest md, HttpURLConnection conn, CustomFile cf) throws Exception {
+		StringBuilder sha = new StringBuilder();
+		byte[] bSha = md.digest();
 		for (int a = 0; a < 28; a++)
-			sha += String.format("%02x", bsha[a]);
+			sha.append(String.format("%02x", bSha[a]));
 
 		String[] lines = readServerResponse(conn);
 
@@ -221,7 +215,7 @@ public class Uploader {
 			return false;
 		}
 
-		if (lines[2].indexOf(sha) != 0) {
+		if (lines[2].indexOf(sha.toString()) != 0) {
 			this.onError.accept(
 					new Error("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha
 							+ " from server"));
@@ -280,7 +274,7 @@ public class Uploader {
 				this.serverUrl = this.serverUrl.replace(dtc[a], dtp[a]);
 		}
 
-		Log.d("Uploader", "Server Url: " + this.serverUrl);
+		Log.d(TAG, "Server Url: " + this.serverUrl);
 	}
 
 	public String getServerUrl() {
@@ -290,5 +284,4 @@ public class Uploader {
 	public String getPassword() {
 		return this.password;
 	}
-
 }
