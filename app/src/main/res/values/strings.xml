@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Party UP!</string>
+    <string name="upload_default_string">Upload the following?</string>
     <string-array name="konsuccess">
         <item>menu</item>
         <item>copy</item>
@@ -12,4 +13,15 @@
         <item>Share file link</item>
         <item>Exit app</item>
     </string-array>
+    <string name="initiate_upload">initiate upload</string>
+    <string name="expires">Expires:</string>
+    <string name="share_expiration_hint">e.g. 30m, 2h, 7d</string>
+    <string name="password">Password:</string>
+    <string name="share_password_hint">optional</string>
+    <string name="copy_link">copy\nlink</string>
+    <string name="show_qr_code">Show QR code</string>
+    <string name="share_link">share\nlink</string>
+    <string name="close_app">close\napp</string>
+    <string name="open_settings">open settings</string>
+    <string name="textview_placeholder">TextView</string>
 </resources>

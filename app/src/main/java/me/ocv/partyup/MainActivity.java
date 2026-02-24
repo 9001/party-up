@@ -1,11 +1,11 @@
 package me.ocv.partyup;
 
-import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import me.ocv.partyup.databinding.ActivityMainBinding;
 

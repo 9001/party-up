@@ -15,14 +15,14 @@
         android:layout_marginLeft="20dp"
         android:layout_marginTop="20dp"
         android:layout_marginRight="20dp"
-        android:text="open settings" />
+        android:text="@string/open_settings" />
 
     <TextView
         android:id="@+id/textView4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="20dp"
-        android:text="TextView" />
+        android:text="@string/textview_placeholder" />
 
     <ImageView
         android:id="@+id/imageView"

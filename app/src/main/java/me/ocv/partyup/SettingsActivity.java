@@ -8,10 +8,9 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-
-import androidx.preference.PreferenceManager;
 import androidx.preference.EditTextPreference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -35,6 +34,15 @@ public class SettingsActivity extends AppCompatActivity {
             ed.putString("on_up_ok", "menu");
             ed.apply();
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            super.onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     public static class SettingsFragment extends PreferenceFragmentCompat {
@@ -123,20 +131,15 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             switch (unit) {
-                case 'm': return num + " minute" + (num != 1 ? "s" : "");
-                case 'h': return num + " hour" + (num != 1 ? "s" : "");
-                case 'd': return num + " day" + (num != 1 ? "s" : "");
-                default: return "Never expires";
+                case 'm':
+                    return num + " minute" + (num != 1 ? "s" : "");
+                case 'h':
+                    return num + " hour" + (num != 1 ? "s" : "");
+                case 'd':
+                    return num + " day" + (num != 1 ? "s" : "");
+                default:
+                    return "Never expires";
             }
         }
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            super.onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
 }

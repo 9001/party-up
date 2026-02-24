@@ -9,6 +9,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +40,7 @@ public class PermissionUtils {
 
     /**
      * Checks for storage permission and requests it if it's not granted.
+     *
      * @param activity The activity to use for checking and requesting permissions.
      * @return true if the permission is already granted, false otherwise.
      */

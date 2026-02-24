@@ -27,7 +27,7 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="@dimen/fab_margin"
         android:layout_marginBottom="16dp"
-        android:contentDescription="initiate upload"
+        android:contentDescription="@string/initiate_upload"
         app:srcCompat="@android:drawable/ic_dialog_email" />
 
     <LinearLayout
@@ -47,12 +47,18 @@
             android:layout_weight="0"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/upper_info"
+            <ScrollView
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Upload the following?"
-                android:textAlignment="center" />
+                android:layout_height="match_parent">
+
+                    <TextView
+                        android:id="@+id/upper_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:isScrollContainer="true"
+                        android:text="@string/upload_default_string"
+                        android:textAlignment="center" />
+            </ScrollView>
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -89,7 +95,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Expires:"
+                    android:text="@string/expires"
                     android:textSize="14sp" />
 
                 <EditText
@@ -98,7 +104,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:hint="e.g. 30m, 2h, 7d"
+                    android:hint="@string/share_expiration_hint"
                     android:inputType="text"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -112,7 +118,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Password:"
+                    android:text="@string/password"
                     android:textSize="14sp" />
 
                 <EditText
@@ -121,7 +127,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
                     android:layout_weight="1"
-                    android:hint="optional"
+                    android:hint="@string/share_password_hint"
                     android:inputType="text"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -146,7 +152,7 @@
                 android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
-                android:text="copy\nlink" />
+                android:text="@string/copy_link" />
 
             <Button
                 android:id="@+id/btnQrCode"
@@ -154,7 +160,7 @@
                 android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
-                android:text="Show QR code" />
+                android:text="@string/show_qr_code" />
 
             <Button
                 android:id="@+id/btnShareLink"
@@ -162,7 +168,7 @@
                 android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
-                android:text="share\nlink" />
+                android:text="@string/share_link" />
 
             <Button
                 android:id="@+id/btnExit"
@@ -170,7 +176,7 @@
                 android:layout_height="match_parent"
                 android:layout_margin="5dp"
                 android:layout_weight="1"
-                android:text="close\napp" />
+                android:text="@string/close_app" />
         </LinearLayout>
 
         <ProgressBar
