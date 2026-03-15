@@ -9,7 +9,7 @@ primarily made for this year's meadup, letting a room full of nerds throw memes 
 only the PUT API is implemented for now so there is no resumable uploads yet
 
 
-## basic usage
+## Basic usage
 
 ![screenshots showing the workflow of sharing a picture to this app](metadata/en-US/images/featureGraphic.png)
 
@@ -19,7 +19,7 @@ only the PUT API is implemented for now so there is no resumable uploads yet
 now all share buttons in other apps/browsers will have "Party UP!" as an option, letting you upload pics / vids / twitter links / anything really
 
 
-## in case of permission errors
+## In case of permission errors
 
 as of Android 11 (SDK30), a new API for sharing files was unfortunately enforced
 
@@ -28,7 +28,7 @@ if you get `Error3: java.io.FileNotFoundException` then that's because you are s
 if you really need to share files from such outdated apps, then you'll have to use PartyUP 1.6.0 or older -- these versions were compiled for Android 9 (SDK28) which gives them permission to use the old API
 
 
-## the full experience
+## The full experience
 
 setup a raspberry pi (raspbian or something else with a desktop) with the [very-bad-idea](https://github.com/9001/copyparty/blob/hovudstraum/bin/mtag/very-bad-idea.py) plugin:
 
