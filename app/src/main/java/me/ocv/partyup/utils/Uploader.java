@@ -5,6 +5,7 @@ import android.net.Uri;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.core.util.Consumer;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -20,11 +21,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
-import java.util.function.Consumer;
 
 import me.ocv.partyup.objects.CustomFile;
 import me.ocv.partyup.objects.UploadProgress;
-
 
 public class Uploader {
     private static final String TAG = "Uploader";
@@ -32,8 +31,7 @@ public class Uploader {
     private String serverUrl;
     private String password;
     private Consumer<Error> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
-    private Consumer<UploadProgress> onProgress = (progress) -> Log.i(TAG,
-            String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
+    private Consumer<UploadProgress> onProgress = (progress) -> Log.i(TAG, String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
     private Runnable onInit = () -> Log.d(TAG, "Uploading started!");
     private Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
     private Context context;
@@ -66,8 +64,7 @@ public class Uploader {
 
             while (true) {
                 int n = ins.read(buf);
-                if (n == -1)
-                    break;
+                if (n == -1) break;
 
                 os.write(buf, 0, n);
                 md.update(buf, 0, n);
@@ -81,8 +78,7 @@ public class Uploader {
             os.flush();
             int rc = conn.getResponseCode();
             if (rc >= 300) {
-                this.onError.accept(new Error("Server error " + rc + ":\n" +
-                        this.read_err(conn)));
+                this.onError.accept(new Error("Server error " + rc + ":\n" + this.read_err(conn)));
                 conn.disconnect();
                 return false;
             }
@@ -99,8 +95,8 @@ public class Uploader {
 
         Log.d(TAG, "Creating body...");
 
-        byte[] body = ("msg=" + URLEncoder.encode(cf.content, "UTF-8"))
-                .getBytes(StandardCharsets.UTF_8);
+        @SuppressWarnings("CharsetObjectCanBeUsed")
+        byte[] body = ("msg=" + URLEncoder.encode(cf.content, StandardCharsets.UTF_8.name())).getBytes(StandardCharsets.UTF_8);
 
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
@@ -153,8 +149,7 @@ public class Uploader {
             uploadSuccess = this.uploadFile(cf, conn);
         }
 
-        if (uploadSuccess)
-            this.onComplete.run();
+        if (uploadSuccess) this.onComplete.run();
 
         Log.i(TAG, String.format("Uploader result: %s", uploadSuccess));
         conn.disconnect();
@@ -170,8 +165,7 @@ public class Uploader {
         URL url = new URL(fullUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
-        if (this.password != null)
-            conn.setRequestProperty("PW", this.password);
+        if (this.password != null) conn.setRequestProperty("PW", this.password);
 
         conn.setDoOutput(true);
         Log.d(TAG, "Sending to: " + fullUrl);
@@ -216,16 +210,12 @@ public class Uploader {
         }
 
         if (lines[2].indexOf(sha.toString()) != 0) {
-            this.onError.accept(
-                    new Error("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha
-                            + " from server"));
+            this.onError.accept(new Error("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server"));
             return false;
         }
 
-        if (lines.length > 3 && !lines[3].isEmpty())
-            cf.share_url = lines[3];
-        else
-            cf.share_url = cf.full_url.split("\\?")[0];
+        if (lines.length > 3 && !lines[3].isEmpty()) cf.share_url = lines[3];
+        else cf.share_url = cf.full_url.split("\\?")[0];
 
         return true;
     }
@@ -257,11 +247,9 @@ public class Uploader {
     public void setServerUrl(String url) {
         this.serverUrl = url;
 
-        if (!this.serverUrl.startsWith("http"))
-            this.serverUrl = "http://" + this.serverUrl;
+        if (!this.serverUrl.startsWith("http")) this.serverUrl = "http://" + this.serverUrl;
 
-        if (!this.serverUrl.endsWith("/"))
-            this.serverUrl += "/";
+        if (!this.serverUrl.endsWith("/")) this.serverUrl += "/";
 
         if (this.serverUrl.contains("%")) {
             String[] dtc = "%Y %q %m %d %j %H %M %S".split(" ");

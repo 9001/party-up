@@ -1,11 +1,15 @@
 package me.ocv.partyup;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.preference.PreferenceManager;
 
 import me.ocv.partyup.databinding.ActivityMainBinding;
 
@@ -14,6 +18,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
 
         ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -25,7 +31,11 @@ public class MainActivity extends AppCompatActivity {
                 "<p>You can also share things like youtube videos; the app will then upload a message with the link. The copyparty server can be configured to log these for later viewing.</p>" +
                 "<p>Funfact: You can run the copyparty server itself on any device where Python is available -- and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>";
 
-        binding.textView4.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            binding.textView4.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+        } else {
+            binding.textView4.setText(Html.fromHtml(txt));
+        }
         binding.textView4.setMovementMethod(LinkMovementMethod.getInstance());
 
         binding.settingsBtn.setOnClickListener(v -> {

@@ -2,10 +2,10 @@
     <string name="app_name">Party UP!</string>
     <string name="upload_default_string">Upload the following?</string>
     <string-array name="konsuccess">
-        <item>menu</item>
-        <item>copy</item>
-        <item>share</item>
-        <item>exit</item>
+        <item>Menu</item>
+        <item>Copy</item>
+        <item>Share</item>
+        <item>Exit</item>
     </string-array>
     <string-array name="vonsuccess">
         <item>Show menu (default)</item>
@@ -13,15 +13,18 @@
         <item>Share file link</item>
         <item>Exit app</item>
     </string-array>
-    <string name="initiate_upload">initiate upload</string>
+    <string name="initiate_upload">Initiate upload</string>
     <string name="expires">Expires:</string>
     <string name="share_expiration_hint">e.g. 30m, 2h, 7d</string>
     <string name="password">Password:</string>
-    <string name="share_password_hint">optional</string>
-    <string name="copy_link">copy\nlink</string>
-    <string name="show_qr_code">Show QR code</string>
-    <string name="share_link">share\nlink</string>
-    <string name="close_app">close\napp</string>
-    <string name="open_settings">open settings</string>
+    <string name="share_password_hint">Optional</string>
+    <string name="copy_link">Copy\nLink</string>
+    <string name="show_qr_code">Show \nQR code</string>
+    <string name="share_link">Share\nLink</string>
+    <string name="close_app">Close\nApp</string>
+    <string name="open_settings">Open Settings</string>
     <string name="textview_placeholder">TextView</string>
+    <string name="banner_description">Information on how to upload</string>
+    <string name="anime_girl">An anime girl</string>
+    <string name="share_config_text">Configure share</string>
 </resources>

@@ -25,7 +25,9 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
+import androidx.core.util.Consumer;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
@@ -39,12 +41,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
-import java.util.StringJoiner;
-import java.util.function.Consumer;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
 import me.ocv.partyup.objects.CustomFile;
@@ -74,9 +76,10 @@ public class XferActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (!PermissionUtils.hasAllPermissions(this)) PermissionUtils.requestAllPermissions(this);
-
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         upping = false;
+
+        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
 
         autosend = prefs.getBoolean("autosend", false);
         base_url = prefs.getString("server_url", "");
@@ -99,8 +102,8 @@ public class XferActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
 
-        binding.fab.setOnClickListener(v -> {
-            binding.fab.setVisibility(View.GONE);
+        binding.actionSend.setOnClickListener(v -> {
+            binding.actionSend.setVisibility(View.GONE);
             doUp();
         });
 
@@ -119,7 +122,7 @@ public class XferActivity extends AppCompatActivity {
             progress.t0 = System.currentTimeMillis();
 
             final TextView tv = binding.upperInfo;
-            final ProgressBar pb = binding.progbar;
+            final ProgressBar pb = binding.progressBar;
 
             class ProgressStats {
                 // Set default so it doesn't freak out
@@ -183,7 +186,7 @@ public class XferActivity extends AppCompatActivity {
 
     @NonNull
     private String getTextBody() {
-        StringJoiner messages = new StringJoiner("\n");
+        List<String> messages = new ArrayList<>();
 
         int counter = 1;
         for (CustomFile cf : files) {
@@ -196,12 +199,12 @@ public class XferActivity extends AppCompatActivity {
         }
 
         String header = String.format("Post%s the following link%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "", autosend ? ":" : "?");
-        return counter == 1 ? "" : String.join("\n\n", header, messages.toString(), counter > 10 ? "[...]" : "");
+        return counter == 1 ? "" : String.join("\n\n", header, String.join("\n", messages), counter > 10 ? "[...]" : "");
     }
 
     @NonNull
     private String getFileBody() {
-        StringJoiner filenames = new StringJoiner("\n");
+        List<String> filenames = new ArrayList<>();
         int counter = 1;
         for (CustomFile file : files) {
             if (counter > 10) break;
@@ -213,7 +216,7 @@ public class XferActivity extends AppCompatActivity {
         }
 
         String header = String.format("Upload%s the following file%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "", autosend ? ":" : "?");
-        return counter == 1 ? "" : String.join("\n\n", header, filenames.toString(), counter > 10 ? "[...]" : "");
+        return counter == 1 ? "" : String.join("\n\n", header, String.join("\n", filenames), counter > 10 ? "[...]" : "");
     }
 
     public void showShareSettings() {
@@ -261,9 +264,9 @@ public class XferActivity extends AppCompatActivity {
             return;
         }
 
-        binding.progbar.setVisibility(View.GONE);
+        binding.progressBar.setVisibility(View.GONE);
         binding.shareSettings.setVisibility(View.GONE);
-        binding.successbuttons.setVisibility(View.VISIBLE);
+        binding.successButtons.setVisibility(View.VISIBLE);
 
         binding.btnExit.setOnClickListener(v -> finishAndRemoveTask());
 
@@ -329,34 +332,9 @@ public class XferActivity extends AppCompatActivity {
 
             ImageDialog.show();
         } catch (WriterException e) {
-            throw new RuntimeException(e);
+            Toast.makeText(this, e.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+            Log.e("Xfer", "Unable to show QR", e);
         }
-    }
-
-    public void needStorage(String msg) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && msg.contains("EACCES")) {
-            showMsg(msg + "\n\nThe app you shared from uses deprecated file APIs.");
-            return;
-        }
-
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-            request_storage();
-            return;
-        }
-
-        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (checkSelfPermission(perm) == PackageManager.PERMISSION_GRANTED)
-            return; // already have it, so that\'s not why it failed
-
-        if (!shouldShowRequestPermissionRationale(perm)) {
-            request_storage();
-            return;
-        }
-
-        AlertDialog.Builder ab = new AlertDialog.Builder(findViewById(R.id.upper_info).getContext());
-        ab.setMessage("PartyUP! needs additional permissions to read that file, because the app you" + "shared it from is using old APIs.").setPositiveButton("OK", (dialog, which) -> request_storage()).setNegativeButton("Cancel", (dialog, which) -> {
-
-        }).show();
     }
 
     @NonNull
@@ -370,6 +348,7 @@ public class XferActivity extends AppCompatActivity {
         return needed.toArray(new CustomFile[0]);
     }
 
+    @SuppressWarnings("CharsetObjectCanBeUsed")
     public String createShareUrl() {
         try {
             CustomFile[] wantedFiles = getWantedFiles();
@@ -396,7 +375,13 @@ public class XferActivity extends AppCompatActivity {
 
             for (int i = 0; i < wantedFiles.length; i++) {
                 CustomFile cf = wantedFiles[i];
-                String filePath = java.net.URLDecoder.decode(new URL(cf.full_url).getPath(), "UTF-8");
+                String filePath;
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    filePath = URLDecoder.decode(new URL(cf.full_url).getPath(), StandardCharsets.UTF_8);
+                } else {
+                    filePath = URLDecoder.decode(new URL(cf.full_url).getPath(), "UTF-8");
+                }
 
                 sharedFilesPaths.append("\"").append(filePath).append("\"");
                 if (i < files.length - 1) {
@@ -450,11 +435,6 @@ public class XferActivity extends AppCompatActivity {
             return response.substring(15);
 
         return "";
-    }
-
-    public void request_storage() {
-        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-        requestPermissions(new String[]{perm}, 573);
     }
 
     @Override
