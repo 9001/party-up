@@ -6,6 +6,7 @@ import android.text.InputType;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
@@ -39,9 +40,9 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            super.onBackPressed();
+            super.getOnBackPressedDispatcher().onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -69,7 +70,7 @@ public class SettingsActivity extends AppCompatActivity {
 
             EditTextPreference sUrl = findPreference("server_url");
             if (sUrl != null) {
-                sUrl.setDialogMessage("to upload into a folder, add the folder at the end of the URL, for example “https://ask.com/foo/bar/”\n\nExample: “https://ask.com/%Y/%m/” will create\n“/Year/month/” (%Y/%m/%d, %H:%M:%S)");
+                sUrl.setDialogMessage("To upload into a folder, add the folder at the end of the URL.\nFor example: \"https://ask.com/foo/bar/\"\nExample: \"https://ask.com/%Y/%m/\" will create\n\"/Year/month/\" (%Y/%m/%d, %H:%M:%S)");
             }
 
             EditTextPreference passwd = findPreference("server_password");
@@ -95,7 +96,7 @@ public class SettingsActivity extends AppCompatActivity {
                     });
                 });
 
-                passwd.setDialogMessage("if server has enabled login using usernames, input “<username>:<password>”,\nfor example azure:hunter2\n\nLong-press to reveal the password");
+                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\",\nFor example: azure:hunter2\n\nLong-press to reveal the password");
             }
 
             EditTextPreference linkExp = findPreference("link_expiration");
