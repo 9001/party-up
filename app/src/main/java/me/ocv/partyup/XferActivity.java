@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -26,8 +27,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.preference.PreferenceManager;
 import androidx.core.util.Consumer;
+import androidx.preference.PreferenceManager;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
@@ -73,6 +74,15 @@ public class XferActivity extends AppCompatActivity {
     private CustomFile[] files;
 
     @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finishAndRemoveTask();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (!PermissionUtils.hasAllPermissions(this)) PermissionUtils.requestAllPermissions(this);
@@ -100,7 +110,8 @@ public class XferActivity extends AppCompatActivity {
 
         binding = ActivityXferBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        setSupportActionBar(binding.toolbar);
+
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         binding.actionSend.setOnClickListener(v -> {
             binding.actionSend.setVisibility(View.GONE);
@@ -172,7 +183,7 @@ public class XferActivity extends AppCompatActivity {
             findViewById(R.id.upper_info).post(this::onSuccess);
         } catch (Exception ex) {
             Log.e(TAG, ex.toString());
-            tShowMsg("Error2: " + ex + "\n\nmaybe wrong password?");
+            tShowMsg("Error2: " + ex + "\n\nMaybe wrong password?");
         }
     }
 
@@ -260,7 +271,7 @@ public class XferActivity extends AppCompatActivity {
             else if (act.equals("share")) shareLink(share_url);
             else Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
 
-            finishAndRemoveTask();
+            XferActivity.this.finishAndRemoveTask();
             return;
         }
 
@@ -268,7 +279,7 @@ public class XferActivity extends AppCompatActivity {
         binding.shareSettings.setVisibility(View.GONE);
         binding.successButtons.setVisibility(View.VISIBLE);
 
-        binding.btnExit.setOnClickListener(v -> finishAndRemoveTask());
+        binding.btnExit.setOnClickListener(v -> XferActivity.this.finishAndRemoveTask());
 
         binding.btnCopyLink.setOnClickListener(v -> copyLink(share_url));
         binding.btnShareLink.setOnClickListener(v -> shareLink(share_url));

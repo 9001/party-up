@@ -13,17 +13,11 @@ android {
         versionCode 10901
         versionName "1.9.1"
         multiDexEnabled true
-
-//        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-//        signingConfig signingConfigs.release
-//        minSdkVersion 24
-//        targetSdkVersion 34
-    }
+   }
 
     buildTypes {
         release {
             minifyEnabled true
-//            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 
@@ -50,8 +44,4 @@ dependencies {
     implementation libs.material
     implementation libs.preference
     implementation libs.zixing.core
-
-//    testImplementation libs.junit
-//    androidTestImplementation lib.ext.junit
-//    androidTestImplementation lib.espresso.core
 }

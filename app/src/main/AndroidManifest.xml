@@ -26,8 +26,7 @@
         </activity>
         <activity
             android:name=".XferActivity"
-            android:exported="true"
-            android:theme="@style/Theme.PartyUP.NoActionBar">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
