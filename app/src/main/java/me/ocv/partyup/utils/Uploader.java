@@ -30,7 +30,7 @@ public class Uploader {
 
     private String serverUrl;
     private String password;
-    private Consumer<Error> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
+    private Consumer<Throwable> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
     private Consumer<UploadProgress> onProgress = (progress) -> Log.i(TAG, String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
     private Runnable onInit = () -> Log.d(TAG, "Uploading started!");
     private Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
@@ -78,7 +78,7 @@ public class Uploader {
             os.flush();
             int rc = conn.getResponseCode();
             if (rc >= 300) {
-                this.onError.accept(new Error("Server error " + rc + ":\n" + this.read_err(conn)));
+                this.onError.accept(new RuntimeException("Server error " + rc + ":\n" + this.read_err(conn)));
                 conn.disconnect();
                 return false;
             }
@@ -119,7 +119,7 @@ public class Uploader {
 
         int rc = conn.getResponseCode();
         if (rc >= 300) {
-            this.onError.accept(new Error("Server error " + rc + ":\n" + read_err(conn)));
+            this.onError.accept(new RuntimeException("Server error " + rc + ":\n" + read_err(conn)));
             conn.disconnect();
             return false;
         }
@@ -205,12 +205,12 @@ public class Uploader {
         String[] lines = readServerResponse(conn);
 
         if (lines.length < 3) {
-            this.onError.accept(new Error("SERVER ERROR:\n" + lines[0]));
+            this.onError.accept(new RuntimeException("SERVER ERROR:\n" + lines[0]));
             return false;
         }
 
         if (lines[2].indexOf(sha.toString()) != 0) {
-            this.onError.accept(new Error("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server"));
+            this.onError.accept(new RuntimeException("ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" + sha + " from server"));
             return false;
         }
 
@@ -228,7 +228,7 @@ public class Uploader {
         this.onProgress = onProc;
     }
 
-    public void setOnError(Consumer<Error> onErr) {
+    public void setOnError(Consumer<Throwable> onErr) {
         this.onError = onErr;
     }
 

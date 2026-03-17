@@ -10,6 +10,8 @@
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="Server URL"
+            android:inputType="textUri"
+            android:autofillHints="url"
             app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             android:key="server_password"

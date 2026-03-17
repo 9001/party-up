@@ -27,4 +27,5 @@
     <string name="banner_description">Information on how to upload</string>
     <string name="anime_girl">An anime girl</string>
     <string name="share_config_text">Configure share</string>
+    <string name="initiate_config">Show Configuration</string>
 </resources>

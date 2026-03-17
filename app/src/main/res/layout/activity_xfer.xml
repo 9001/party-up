@@ -31,6 +31,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:lineSpacingExtra="4dp"
+                        android:textAppearance="@style/TextAppearance.PartyUP.Normal"
                         android:text="@string/upload_default_string"
                         android:textAlignment="center" />
                 </LinearLayout>
@@ -176,7 +177,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="@dimen/fab_margin"
         android:contentDescription="@string/initiate_upload"
         android:padding="0dp"
         app:backgroundTint="?attr/colorSurface"
@@ -185,6 +186,22 @@
         app:maxImageSize="28dp"
         app:rippleColor="?attr/colorControlHighlight"
         app:srcCompat="@android:drawable/ic_menu_send"
+        app:tint="?attr/colorOnSurface" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/action_config"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="@dimen/fab_margin"
+        android:contentDescription="@string/initiate_config"
+        android:padding="0dp"
+        app:backgroundTint="?attr/colorSurface"
+        app:elevation="4dp"
+        app:fabSize="normal"
+        app:maxImageSize="24dp"
+        app:rippleColor="?attr/colorControlHighlight"
+        app:srcCompat="@android:drawable/ic_menu_edit"
         app:tint="?attr/colorOnSurface" />
 
 </FrameLayout>

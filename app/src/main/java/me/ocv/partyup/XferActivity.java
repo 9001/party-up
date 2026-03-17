@@ -69,6 +69,7 @@ public class XferActivity extends AppCompatActivity {
     private String base_url;
     private String password;
 
+    private Boolean uploaded;
     private Boolean upping;
     private Boolean autosend;
     private CustomFile[] files;
@@ -83,24 +84,20 @@ public class XferActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        loadPrefs();
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (!PermissionUtils.hasAllPermissions(this)) PermissionUtils.requestAllPermissions(this);
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         upping = false;
-
-        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
-
-        autosend = prefs.getBoolean("autosend", false);
-        base_url = prefs.getString("server_url", "");
-        password = prefs.getString("server_password", "");
-        if (password.isEmpty() || password.equals("Default value")) password = null;
+        uploaded = false;
 
         files = discovery.parseIntent(this, getIntent(), (e) -> Log.e(TAG, e));
-
-        uploader.setContext(this);
-        uploader.setPassword(password);
-        uploader.setServerUrl(base_url);
 
         for (CustomFile cf : files) {
             if (cf.size != null && cf.size > 0) {
@@ -112,23 +109,66 @@ public class XferActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        setButtons();
+    }
+
+    private void loadPrefs() {
+        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
+
+        if (!uploaded) {
+            autosend = prefs.getBoolean("autosend", false);
+            base_url = prefs.getString("server_url", "");
+            password = prefs.getString("server_password", "");
+            if (password.isEmpty() || password.equals("Default value")) password = null;
+
+            uploader.setContext(this);
+            uploader.setPassword(password);
+            uploader.setServerUrl(base_url);
+
+            if (autosend) doUp();
+            else showShareSettings();
+        }
+    }
+
+    private void setButtons() {
+        binding.actionConfig.setOnClickListener(v -> XferActivity.this.startActivity(new Intent(this, SettingsActivity.class)));
 
         binding.actionSend.setOnClickListener(v -> {
             binding.actionSend.setVisibility(View.GONE);
+            binding.actionConfig.setVisibility(View.GONE);
+
             doUp();
         });
 
-        if (autosend) doUp();
-        else showShareSettings();
+        binding.btnQrCode.setEnabled(false);
+        binding.btnShareLink.setEnabled(false);
+        binding.btnCopyLink.setEnabled(false);
+        binding.btnExit.setOnClickListener(v -> finishAndRemoveTask());
     }
 
     private void doUp() {
         if (upping) return;
         upping = true;
+
+        binding.actionSend.setEnabled(false);
+        binding.actionConfig.setEnabled(false);
+
         new Thread(this::doUp2).start();
     }
 
     private void doUp2() {
+        Consumer<Throwable> onError = (err) -> {
+            Log.e(TAG, err.toString());
+            tShowMsg("Error2: " + err + "\n\nMaybe wrong password?");
+
+            binding.getRoot().post(() -> {
+                binding.actionSend.setEnabled(true);
+                binding.actionConfig.setEnabled(true);
+                binding.actionSend.setVisibility(View.VISIBLE);
+                binding.actionConfig.setVisibility(View.VISIBLE);
+            });
+        };
+
         try {
             progress.t0 = System.currentTimeMillis();
 
@@ -156,7 +196,6 @@ public class XferActivity extends AppCompatActivity {
                     Log.e(TAG, "Issue in ui updating: " + e);
                 }
             };
-            Consumer<Error> onError = (err) -> tShowMsg(err.toString());
 
             uploader.setOnError(onError);
 
@@ -180,19 +219,33 @@ public class XferActivity extends AppCompatActivity {
             }
 
             // Handle creation of share url in `onSuccess`
-            findViewById(R.id.upper_info).post(this::onSuccess);
-        } catch (Exception ex) {
-            Log.e(TAG, ex.toString());
-            tShowMsg("Error2: " + ex + "\n\nMaybe wrong password?");
+            uploaded = true;
+            binding.upperInfo.post(this::onSuccess);
+        } catch (Throwable ex) {
+            onError.accept(ex);
+        } finally {
+            upping = false;
         }
     }
 
     public void showMsg(String txt) {
+        if (txt.startsWith("Error2")) {
+            binding.upperInfo.setTextAppearance(
+                    binding.upperInfo.getContext(),
+                    R.style.TextAppearance_PartyUP_Error
+            );
+        } else {
+            binding.upperInfo.setTextAppearance(
+                    binding.upperInfo.getContext(),
+                    R.style.TextAppearance_PartyUP_Normal
+            );
+        }
+
         binding.upperInfo.setText(txt);
     }
 
     public void tShowMsg(String txt) {
-        binding.upperInfo.post(() -> binding.upperInfo.setText(txt));
+        binding.upperInfo.post(() -> showMsg(txt));
     }
 
     @NonNull
@@ -234,8 +287,8 @@ public class XferActivity extends AppCompatActivity {
         if (prefs.getBoolean("use_share_url", false)) {
             binding.shareSettings.setVisibility(View.VISIBLE);
 
-            EditText expField = findViewById(R.id.share_expiration);
-            EditText pwField = findViewById(R.id.share_password);
+            EditText expField = binding.shareExpiration;
+            EditText pwField = binding.sharePassword;
 
             String defaultExp = prefs.getString("link_expiration", "");
             String defaultPw = prefs.getString("share_password", "");
@@ -279,7 +332,14 @@ public class XferActivity extends AppCompatActivity {
         binding.shareSettings.setVisibility(View.GONE);
         binding.successButtons.setVisibility(View.VISIBLE);
 
-        binding.btnExit.setOnClickListener(v -> XferActivity.this.finishAndRemoveTask());
+        binding.actionSend.setVisibility(View.GONE);
+        binding.actionConfig.setVisibility(View.VISIBLE);
+
+        binding.actionConfig.setEnabled(true);
+
+        binding.btnCopyLink.setEnabled(true);
+        binding.btnShareLink.setEnabled(true);
+        binding.btnQrCode.setEnabled(true);
 
         binding.btnCopyLink.setOnClickListener(v -> copyLink(share_url));
         binding.btnShareLink.setOnClickListener(v -> shareLink(share_url));
@@ -379,7 +439,7 @@ public class XferActivity extends AppCompatActivity {
             Uri shareApiUri = Uri.parse(uploader.getServerUrl());
 
             String expiration = getExpiration();
-            EditText pwField = findViewById(R.id.share_password);
+            EditText pwField = binding.sharePassword;
             String sharePw = pwField.getText().toString();
 
             StringBuilder sharedFilesPaths = new StringBuilder();
@@ -462,7 +522,7 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private String getExpiration() {
-        EditText expField = findViewById(R.id.share_expiration);
+        EditText expField = binding.shareExpiration;
         String expValue = expField.getText().toString();
         int[] parsed = parseExpiration(expValue);
         String expiration = "";
