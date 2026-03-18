@@ -54,6 +54,13 @@
             android:dependency="use_share_url"
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+    <PreferenceCategory android:title="Experimental">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="use_service"
+            android:title="Use Service"
+            android:summary="Run upload in a background service (Working)" />
+    </PreferenceCategory>
     <PreferenceCategory android:title="UI">
         <SwitchPreference
             android:defaultValue="false"

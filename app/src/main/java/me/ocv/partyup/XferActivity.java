@@ -56,6 +56,7 @@ import me.ocv.partyup.objects.UploadProgress;
 import me.ocv.partyup.utils.Discovery;
 import me.ocv.partyup.utils.PermissionUtils;
 import me.ocv.partyup.utils.Uploader;
+import me.ocv.partyup.utils.UploaderService;
 
 public class XferActivity extends AppCompatActivity {
     private static final String TAG = "TransferActivity";
@@ -119,7 +120,7 @@ public class XferActivity extends AppCompatActivity {
             autosend = prefs.getBoolean("autosend", false);
             base_url = prefs.getString("server_url", "");
             password = prefs.getString("server_password", "");
-            if (password.isEmpty() || password.equals("Default value")) password = null;
+            if (password != null && (password.isEmpty() || password.equals("Default value"))) password = null;
 
             uploader.setContext(this);
             uploader.setPassword(password);
@@ -153,13 +154,40 @@ public class XferActivity extends AppCompatActivity {
         binding.actionSend.setEnabled(false);
         binding.actionConfig.setEnabled(false);
 
-        new Thread(this::doUp2).start();
+        if (prefs.getBoolean("use_service", false)) {
+            startUploaderService();
+        } else {
+            new Thread(this::doUp2).start();
+        }
+    }
+
+    private void startUploaderService() {
+        Intent intent = new Intent(this, UploaderService.class);
+        intent.putExtra("base_url", base_url);
+        intent.putExtra("password", password);
+        intent.putExtra("files", files);
+        
+        // Grant URI permissions for all files
+        for (CustomFile file : files) {
+            if (file.handle != null) {
+                grantUriPermission(getPackageName(), file.handle, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
+        }
+        
+        Toast.makeText(this, "Upload started in background", Toast.LENGTH_SHORT).show();
+        finish();
     }
 
     private void doUp2() {
         Consumer<Throwable> onError = (err) -> {
             Log.e(TAG, err.toString());
-            tShowMsg("Error2: " + err + "\n\nMaybe wrong password?");
+            tShowMsg("Error: " + err + "\n\nMaybe wrong password?");
 
             binding.getRoot().post(() -> {
                 binding.actionSend.setEnabled(true);
@@ -229,7 +257,7 @@ public class XferActivity extends AppCompatActivity {
     }
 
     public void showMsg(String txt) {
-        if (txt.startsWith("Error2")) {
+        if (txt.startsWith("Error")) {
             binding.upperInfo.setTextAppearance(
                     binding.upperInfo.getContext(),
                     R.style.TextAppearance_PartyUP_Error

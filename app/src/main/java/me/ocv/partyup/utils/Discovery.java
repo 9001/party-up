@@ -7,12 +7,12 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.util.Log;
+import androidx.core.util.Consumer;
 
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Locale;
-import java.util.function.Consumer;
 
 import me.ocv.partyup.objects.CustomFile;
 

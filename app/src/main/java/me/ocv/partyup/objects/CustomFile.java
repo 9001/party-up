@@ -24,6 +24,7 @@ public class CustomFile implements Parcelable {
             return new CustomFile[size];
         }
     };
+
     public Uri handle;
     public Long size;
     public String name;
