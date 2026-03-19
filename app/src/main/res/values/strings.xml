@@ -1,13 +1,13 @@
 <resources>
     <string name="app_name">Party UP!</string>
     <string name="upload_default_string">Upload the following?</string>
-    <string-array name="konsuccess">
+    <string-array name="on_success_action_key">
         <item>Menu</item>
         <item>Copy</item>
         <item>Share</item>
         <item>Exit</item>
     </string-array>
-    <string-array name="vonsuccess">
+    <string-array name="on_success_action_value">
         <item>Show menu (default)</item>
         <item>Copy file link</item>
         <item>Share file link</item>
@@ -28,4 +28,27 @@
     <string name="anime_girl">An anime girl</string>
     <string name="share_config_text">Configure share</string>
     <string name="initiate_config">Show Configuration</string>
+    <string name="notification_title">Party Uploader!</string>
+    <string name="notification_filename_fallback">Mystery upload</string>
+    <string name="notification_upload_text">Upload in progress…</string>
+    <string name="notification_upload_finished_text">All uploaded!</string>
+    <string name="notification_upload_failed_text">Oh no error!</string>
+    <string name="server_default_password">Default Value</string>
+    <string name="notification_upload_info_text">Upload information</string>
+    <string name="xfer_loading">Loading…</string>
+    <string name="greetings">Hi, Welcome to PartyUP!</string>
+    <string name="complete_text">✅👍\n\nCompleted successfully</string>
+    <string name="share_failed_text">Share Failed!</string>
+    <string name="upload_ok">Upload OK</string>
+    <string name="copy_success">Link Copied!</string>
+    <string name="clipboard_label">Copyparty Upload</string>
+    <string name="share_extra_text">Uploaded file</string>
+    <string name="share_link_title">Share file link</string>
+    <string name="welcome_text"><![CDATA[<p><em>Hello from <a href=\"https://github.com/9001/party-up\">Party UP!</a> <b>version %s</b></em></p><p>This app lets you upload files (images, videos) to a <a href=\"https://github.com/9001/copyparty#quickstart\">copyparty</a> server.</p><hr /><p><b>Use your favorite gallery app to open a picture or video you\'d like to upload, then hit the share button and select \"Party UP!\" 🎉</b></p><p>You can also share things like youtube videos; the app will then upload a message with the link. The copyparty server can be configured to log these for later viewing.</p><p>Funfact: You can run the copyparty server itself on any device where Python is available — and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>]]></string>
+    <string name="server_url_help">To upload into a folder, add the folder at the end of the URL.\nFor example: \"https://ask.com/foo/bar/\"\nExample: \"https://ask.com/%Y/%m/\" will create\n\"/Year/month/\" (%Y/%m/%d, %H:%M:%S)</string>
+    <string name="setting_password_empty">Password is not set</string>
+    <string name="setting_password_success">Click to change password</string>
+    <string name="server_password_help"><![CDATA[If server has enabled login using usernames, input \"<username>:<password>\",\nFor example: azure:hunter2\n\nLong-press to reveal the password]]></string>
+    <string name="invalid_expiration">Invalid format. Use: 30m, 2h, 7d, or empty for never</string>
+    <string name="default_expiration">Never expires</string>
 </resources>

@@ -1,263 +1,317 @@
 package me.ocv.partyup.utils;
 
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
+import android.content.SharedPreferences;
+import android.os.Binder;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
-import android.os.Parcelable;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.preference.PreferenceManager;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.Serializable;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Queue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import me.ocv.partyup.R;
-import me.ocv.partyup.XferActivity;
 import me.ocv.partyup.objects.CustomFile;
-import me.ocv.partyup.objects.Progress;
+import me.ocv.partyup.objects.PrefsKey;
 
 public class UploaderService extends Service {
+    public static final String STATE_KEY = "state";
+
     private static final String TAG = "UploaderService";
-    private static final String CHANNEL_ID = "uploader_channel";
-    private static final int NOTIFICATION_ID = 1;
+    private static final String CHANNEL_ID = "Uploader";
+    private static final String CHANNEL_NAME = "PartyUploader";
+    private static final int NOTIFICATION_ID = 69;
 
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Queue<CustomFile> fileQueue = new LinkedList<>();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final UploadProgress uploadProgress = new UploadProgress();
     private final Uploader uploader = new Uploader();
-    private final Progress progress = new Progress();
-    private boolean isUploading = false;
 
-    private String password;
-    private boolean useShareUrl;
-    private String shareExpiration;
-    private String sharePassword;
-    private CustomFile[] files;
+    private final IBinder binder = new UploadBinder();
+
+    private final List<ProgressListener> progressListeners = new ArrayList<>();
+    private final List<ErrorListener> errorListeners = new ArrayList<>();
+
+    private NotificationCompat.Builder notification;
+    private NotificationManager manager;
+
+    private SharedPreferences preferences;
+    private Throwable lastError;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        createNotificationChannel();
         uploader.setContext(this);
+        notification = new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(android.R.drawable.stat_sys_upload).setContentTitle(getString(R.string.notification_title)).setContentText("Initializing...").setProgress(0, 0, true).setOngoing(true);
+
+        manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationSetup();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        progressListeners.clear();
+        errorListeners.clear();
+        executor.shutdownNow();
+        stopForeground(false);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) return START_NOT_STICKY;
+        preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        startForeground(NOTIFICATION_ID, notification.build());
 
-        String baseUrl = intent.getStringExtra("base_url");
-        password = intent.getStringExtra("password");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            files = intent.getParcelableArrayExtra("files", CustomFile.class);
-        } else {
-            Parcelable[] parcelables = intent.getParcelableArrayExtra("files");
-            if (parcelables != null) {
-                // Create a new array of the specific type
-                files = new CustomFile[parcelables.length];
-                // Copy the elements over
-                System.arraycopy(parcelables, 0, files, 0, parcelables.length);
+        try {
+            Serializable serializable = intent.getSerializableExtra(STATE_KEY);
+            UploaderService.STATE state = (STATE) serializable;
+            if (state == null) {
+                refreshPrefs();
             } else {
-                files = new CustomFile[0];
-            }
-        }
-        useShareUrl = intent.getBooleanExtra("use_share_url", false);
-        shareExpiration = intent.getStringExtra("share_expiration");
-        sharePassword = intent.getStringExtra("share_password");
-
-        if (baseUrl == null || files == null) {
-            stopSelf();
-            return START_NOT_STICKY;
-        }
-
-        uploader.setServerUrl(baseUrl);
-        uploader.setPassword(password);
-
-        for (CustomFile cf : files) {
-            if (cf.size != null && cf.size > 0) {
-                progress.total += cf.size;
-            }
-        }
-
-        startForeground(NOTIFICATION_ID, createNotification("Initializing upload..."));
-
-        if (!isUploading) {
-            isUploading = true;
-            new Thread(this::performUpload).start();
-        }
-
-        return START_NOT_STICKY;
-    }
-
-    private void performUpload() {
-        try {
-            progress.t0 = System.currentTimeMillis();
-            for (int i = 0; i < files.length; i++) {
-                final int fileIndex = i;
-                CustomFile file = files[i];
-
-                uploader.setOnProgress(up -> {
-                    progress.done += up.delta;
-                    updateNotification(String.format(Locale.getDefault(), "Uploading %d/%d: %s\n%s",
-                            fileIndex + 1, files.length, file.name, progress.stats()));
-                });
-
-                if (!uploader.upload(file)) {
-                    showFinalNotification("Upload failed: " + file.name, null);
-                    return;
+                if (state.filesToUpload != null) {
+                    enqueueFiles(state.filesToUpload);
                 }
+                uploader.setPassword(state.serverPassword);
+                uploader.setServerUrl(state.baseUrl);
             }
 
-            String shareUrl = "";
-            if (useShareUrl) {
-                shareUrl = createShareUrl(files);
-            }
-
-            showFinalNotification("Upload completed successfully!", shareUrl);
-        } catch (Exception e) {
-            Log.e(TAG, "Upload error", e);
-            showFinalNotification("Upload error: " + e.getMessage(), null);
-        } finally {
-            isUploading = false;
-            stopForeground(false);
-            stopSelf();
-        }
-    }
-
-    private String createShareUrl(CustomFile[] files) {
-        try {
-            List<CustomFile> wantedFiles = new ArrayList<>();
-            for (CustomFile file : files) {
-                if (file.isSharable()) wantedFiles.add(file);
-            }
-
-            if (wantedFiles.isEmpty()) return files[0].share_url;
-
-            String key = generateRandomKey();
-            Uri shareApiUri = Uri.parse(uploader.getServerUrl());
-
-            StringBuilder sharedFilesPaths = new StringBuilder();
-            for (int i = 0; i < wantedFiles.size(); i++) {
-                CustomFile cf = wantedFiles.get(i);
-                String filePath = URLDecoder.decode(new URL(cf.full_url).getPath(), "UTF-8");
-                sharedFilesPaths.append("\"").append(filePath).append("\"");
-                if (i < wantedFiles.size() - 1) sharedFilesPaths.append(",");
-            }
-
-            String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}",
-                    key, sharedFilesPaths, sharePassword != null ? sharePassword : "", shareExpiration != null ? shareExpiration : "");
-
-            HttpURLConnection conn = getUrlConnection(shareApiUri, jsonBody);
-
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
-                String response = br.readLine();
-                if (response != null && response.startsWith("created share: "))
-                    return response.substring(15);
-            }
-        } catch (Exception ex) {
-            Log.w(TAG, "Share creation error: " + ex);
-        }
-        return "";
-    }
-
-    @NonNull
-    private HttpURLConnection getUrlConnection(Uri shareApiUri, String jsonBody) throws IOException {
-        HttpURLConnection conn = (HttpURLConnection) (new URL(shareApiUri.getScheme() + "://" + shareApiUri.getAuthority() + "/")).openConnection();
-        conn.setDoOutput(true);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "text/plain");
-        if (password != null) conn.setRequestProperty("PW", password);
-
-        byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(body.length);
-        conn.connect();
-
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(body);
-        }
-
-        if (conn.getResponseCode() >= 300) throw new RuntimeException("Unable to get share url!");
-        return conn;
-    }
-
-    private String generateRandomKey() {
-        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder key = new StringBuilder();
-        for (int i = 0; i < 12; i++)
-            key.append(chars.charAt(random.nextInt(chars.length())));
-        return key.toString();
-    }
-
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Uploader Service", NotificationManager.IMPORTANCE_LOW);
-            NotificationManager manager = getSystemService(NotificationManager.class);
-            if (manager != null) manager.createNotificationChannel(channel);
-        }
-    }
-
-    private Notification createNotification(String content) {
-        Intent notificationIntent = new Intent(this, XferActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Party UP! Uploading...")
-                .setContentText(content)
-                .setSmallIcon(android.R.drawable.stat_sys_upload)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .build();
-    }
-
-    private void updateNotification(String content) {
-        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (manager != null) manager.notify(NOTIFICATION_ID, createNotification(content));
-    }
-
-    private void showFinalNotification(String content, @Nullable String shareUrl) {
-        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        if (manager != null) {
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Party UP! Upload Status")
-                    .setContentText(content)
-                    .setSmallIcon(android.R.drawable.stat_sys_upload_done)
-                    .setAutoCancel(true);
-
-            if (shareUrl != null && !shareUrl.isEmpty()) {
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("text/plain");
-                shareIntent.putExtra(Intent.EXTRA_TEXT, shareUrl);
-                PendingIntent pendingShare = PendingIntent.getActivity(this, 1, 
-                    Intent.createChooser(shareIntent, "Share link"), 
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                builder.addAction(android.R.drawable.ic_menu_share, "Share Link", pendingShare);
-            }
-
-            manager.notify(NOTIFICATION_ID + 1, builder.build());
+            manager.notify(NOTIFICATION_ID, notification.setContentText("Waiting for upload to start...").setProgress(0, 0, false).build());
+            return START_STICKY;
+        } catch (ClassCastException /* This happens when I tried to retrieve the files */ ex) {
+            Log.e(TAG, "Cannot retrieve state from intent", ex);
+            return START_NOT_STICKY;
         }
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        return binder;
+    }
+
+    private void notificationSetup() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT);
+            manager.createNotificationChannel(channel);
+        }
+    }
+
+    public boolean isDone() {
+        return uploadProgress.doneBytes >= uploadProgress.totalBytes && uploadProgress.currentIndex == uploadProgress.totalFiles - 1;
+    }
+
+    public boolean isQueueEmpty() {
+        return fileQueue.isEmpty();
+    }
+
+    private void notifyNotification(@NonNull UploadProgress progress) {
+        String name = progress.currentFile == null ? getString(R.string.notification_filename_fallback) : (String.format("%s (%s)", progress.currentFile.name, NumberUtils.formatBytes(progress.currentFile.size)));
+        notification.setContentText(getString(R.string.notification_upload_text)).setSubText(name).setProgress(100, (int) Math.floor(NumberUtils.calcPercentage(progress.doneBytes, progress.totalBytes)), progress.totalBytes == 0);
+        manager.notify(NOTIFICATION_ID, notification.build());
+    }
+
+    private void preUpload() {
+        manager.notify(NOTIFICATION_ID, notification.setContentText(getString(R.string.notification_upload_info_text)).setSubText(uploadProgress.smallDescription()).build());
+    }
+
+    private void postUpload() {
+        if (getLastError() == null) {
+            manager.notify(NOTIFICATION_ID, notification.setSmallIcon(android.R.drawable.stat_sys_upload_done).setProgress(0, 0, false).setContentText(getString(R.string.notification_upload_finished_text)).setSubText(uploadProgress.longDescription()).setOngoing(false).build());
+        } else {
+            manager.notify(NOTIFICATION_ID, notification.setSmallIcon(android.R.drawable.stat_notify_error).setProgress(0, 0, false).setContentText(getString(R.string.notification_upload_failed_text)).setSubText(getLastError().getLocalizedMessage()).setOngoing(false).build());
+        }
+    }
+
+    private void notifyProgress(UploadProgress progress) {
+        List<ProgressListener> deadListeners = new ArrayList<>();
+
+        for (int i = 0; i < progressListeners.size(); i++) {
+            ProgressListener l = progressListeners.get(i);
+            this.handler.post(() -> {
+                try {
+                    l.onProgress(progress);
+                } catch (Throwable error) {
+                    Log.e(TAG, "Error notifying progress listener " + l.hashCode(), error);
+                    deadListeners.add(l);
+                }
+            });
+        }
+
+        notifyNotification(progress);
+        if (!deadListeners.isEmpty()) {
+            for (ProgressListener l : deadListeners) {
+                progressListeners.remove(l);
+            }
+        }
+    }
+
+    private void notifyError(Throwable error) {
+        List<ErrorListener> deadListeners = new ArrayList<>();
+
+        for (int i = 0; i < errorListeners.size(); ++i) {
+            ErrorListener l = errorListeners.get(i);
+            this.handler.post(() -> {
+                try {
+                    l.onError(error);
+                } catch (Throwable err) {
+                    // Irony lmao
+                    Log.e(TAG, "Error notifying error listener " + l.hashCode(), err);
+                    deadListeners.add(l);
+                }
+            });
+        }
+
+        if (!deadListeners.isEmpty()) {
+            for (ErrorListener i : deadListeners) {
+                errorListeners.remove(i);
+            }
+        }
+        lastError = error;
+    }
+
+    private void uploadFile() {
+        if ((uploadProgress.currentFile = getFile()) == null) return;
+
+        uploader.setOnProgress(progress -> {
+            uploadProgress.doneBytes += progress.delta;
+            notifyProgress(uploadProgress);
+        });
+
+        uploader.setOnError(this::notifyError);
+
+        try {
+            uploader.upload(uploadProgress.currentFile);
+        } catch (Throwable e) {
+            Log.e(TAG, "UploaderError", e);
+            notifyError(e);
+        }
+    }
+
+    @Nullable
+    private CustomFile getFile() {
+        if (!fileQueue.isEmpty()) {
+            CustomFile file = fileQueue.poll();
+            uploadProgress.currentIndex++;
+            return file;
+        }
+
         return null;
+    }
+
+    public void refreshPrefs() {
+        String password = preferences.getString(PrefsKey.SERVER_PASSWORD, "");
+        String baseUrl = preferences.getString(PrefsKey.SERVER_URL, "");
+        uploader.setPassword(password.isEmpty() || password.equals(getString(R.string.server_default_password)) ? null : password);
+        uploader.setServerUrl(baseUrl);
+    }
+
+    public void addProgressListener(ProgressListener progressListener) {
+        this.progressListeners.add(progressListener);
+    }
+
+    public void addErrorListener(ErrorListener errorListener) {
+        this.errorListeners.add(errorListener);
+    }
+
+    public void enqueueFile(@NonNull CustomFile file) {
+        fileQueue.add(file);
+        uploadProgress.totalFiles++;
+
+        if (file.size != null) {
+            uploadProgress.totalBytes += file.size;
+        }
+
+        Log.d(TAG, String.format("File enqueued: %s", file));
+    }
+
+    public void enqueueFiles(@NonNull CustomFile[] files) {
+        for (CustomFile file : files) {
+            enqueueFile(file);
+        }
+    }
+
+    public void startUploading() {
+        executor.submit(() -> {
+            preUpload();
+            while (fileQueue.peek() != null) {
+                uploadFile();
+            }
+            postUpload();
+        });
+    }
+
+    public Handler getHandler() {
+        return this.handler;
+    }
+
+    public Throwable getLastError() {
+        return lastError;
+    }
+
+    @FunctionalInterface
+    public interface ProgressListener {
+        void onProgress(UploaderService.UploadProgress progress);
+    }
+
+    @FunctionalInterface
+    public interface ErrorListener {
+        void onError(Throwable error);
+    }
+
+    public static final class STATE implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        public String baseUrl;
+        public String serverPassword;
+        public CustomFile[] filesToUpload;
+    }
+
+    public static final class UploadProgress {
+        public long totalBytes = 0;
+        public long doneBytes = 0;
+
+        public int totalFiles = 0;
+        public int currentIndex = -1;
+        public CustomFile currentFile = null;
+
+        @NonNull
+        public String smallDescription() {
+            return String.format(Locale.getDefault(), "Files: %d (%s)", totalFiles, NumberUtils.formatBytes(totalBytes));
+        }
+
+        @NonNull
+        public String longDescription() {
+            return String.format(Locale.getDefault(), "(%.1f%%) File: %d/%d [%s]", NumberUtils.calcPercentage(doneBytes, totalBytes), currentIndex + 1, totalFiles, NumberUtils.formatBytes(currentFile != null ? currentFile.size : 0));
+        }
+
+        @NonNull
+        public String smallProgress() {
+            return String.format(Locale.getDefault(), "Progress: %.1f%%", NumberUtils.calcPercentage(doneBytes, totalBytes));
+        }
+    }
+
+    public final class UploadBinder extends Binder {
+        public UploaderService getService() {
+            return UploaderService.this;
+        }
     }
 }

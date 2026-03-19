@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
 
 import me.ocv.partyup.databinding.ActivityMainBinding;
+import me.ocv.partyup.objects.PrefsKey;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -19,17 +20,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
+        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean(PrefsKey.DARK_MODE, false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
 
         ActivityMainBinding binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
-        String txt = "<p><em>Hello from <a href=\"https://github.com/9001/party-up\">Party UP!</a> <b>version " + BuildConfig.VERSION_NAME + "</b></em></p>" +
-                "<p>This app lets you upload files (images, videos) to a <a href=\"https://github.com/9001/copyparty#quickstart\">copyparty</a> server.</p>" +
-                "<hr />" +
-                "<p><b>Use your favorite gallery app to open a picture or video you'd like to upload, then hit the share button and select \"Party UP!\" \uD83C\uDF89</b></p>" +
-                "<p>You can also share things like youtube videos; the app will then upload a message with the link. The copyparty server can be configured to log these for later viewing.</p>" +
-                "<p>Funfact: You can run the copyparty server itself on any device where Python is available -- and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>";
+        String txt = String.format(getString(R.string.welcome_text), BuildConfig.VERSION_NAME);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             binding.textView4.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));

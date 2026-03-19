@@ -15,6 +15,8 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreference;
 
+import me.ocv.partyup.objects.PrefsKey;
+
 public class SettingsActivity extends AppCompatActivity {
 
     @Override
@@ -32,9 +34,9 @@ public class SettingsActivity extends AppCompatActivity {
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        if (prefs.getString("on_up_ok", "menu").equals("menu")) {
+        if (prefs.getString(PrefsKey.ON_UP_OK, "menu").equals("menu")) {
             SharedPreferences.Editor ed = prefs.edit();
-            ed.putString("on_up_ok", "menu");
+            ed.putString(PrefsKey.ON_UP_OK, "menu");
             ed.apply();
         }
     }
@@ -52,8 +54,30 @@ public class SettingsActivity extends AppCompatActivity {
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
-            SwitchPreference darkMode = findPreference("dark_mode");
 
+            SwitchPreference beSilent = findPreference(PrefsKey.BE_SILENT);
+            SwitchPreference autoSend = findPreference(PrefsKey.AUTOSEND);
+
+            if (beSilent != null && autoSend != null) {
+                beSilent.setOnPreferenceChangeListener((p, n) -> {
+                    boolean enabled = (Boolean) n;
+                    if (enabled) {
+                        autoSend.setChecked(true);   // force ON
+                        autoSend.setEnabled(false);  // lock it
+                    } else {
+                        autoSend.setEnabled(true);   // unlock
+                    }
+                    return true;
+                });
+
+                boolean enabled = beSilent.isChecked();
+                autoSend.setEnabled(!enabled);
+                if (enabled) {
+                    autoSend.setChecked(true);
+                }
+            }
+
+            SwitchPreference darkMode = findPreference(PrefsKey.DARK_MODE);
             if (darkMode != null) {
                 darkMode.setOnPreferenceChangeListener((preference, newValue) -> {
                     boolean enabled = (Boolean) newValue;
@@ -68,18 +92,18 @@ public class SettingsActivity extends AppCompatActivity {
                 });
             }
 
-            EditTextPreference sUrl = findPreference("server_url");
+            EditTextPreference sUrl = findPreference(PrefsKey.SERVER_URL);
             if (sUrl != null) {
-                sUrl.setDialogMessage("To upload into a folder, add the folder at the end of the URL.\nFor example: \"https://ask.com/foo/bar/\"\nExample: \"https://ask.com/%Y/%m/\" will create\n\"/Year/month/\" (%Y/%m/%d, %H:%M:%S)");
+                sUrl.setDialogMessage(getString(R.string.server_url_help));
             }
 
-            EditTextPreference passwd = findPreference("server_password");
+            EditTextPreference passwd = findPreference(PrefsKey.SERVER_PASSWORD);
             if (passwd != null) {
                 passwd.setSummaryProvider(preference -> {
                     if (passwd.getText() == null || passwd.getText().isEmpty()) {
-                        return "Password is not set";
+                        return getString(R.string.setting_password_empty);
                     } else {
-                        return "Click to change password";
+                        return getString(R.string.setting_password_success);
                     }
                 });
                 passwd.setOnBindEditTextListener(editText -> {
@@ -96,10 +120,10 @@ public class SettingsActivity extends AppCompatActivity {
                     });
                 });
 
-                passwd.setDialogMessage("If server has enabled login using usernames, input \"<username>:<password>\",\nFor example: azure:hunter2\n\nLong-press to reveal the password");
+                passwd.setDialogMessage(getString(R.string.server_password_help));
             }
 
-            EditTextPreference linkExp = findPreference("link_expiration");
+            EditTextPreference linkExp = findPreference(PrefsKey.LINK_EXPIRATION);
             if (linkExp != null) {
                 // Use SummaryProvider for dynamic summary
                 linkExp.setSummaryProvider(preference -> {
@@ -128,16 +152,16 @@ public class SettingsActivity extends AppCompatActivity {
             if (value.matches("^\\d+[mhd]?$"))
                 return null; // Valid format
 
-            return "Invalid format. Use: 30m, 2h, 7d, or empty for never";
+            return getString(R.string.invalid_expiration);
         }
 
         private String getExpSummaryText(String value) {
             if (value == null || value.trim().isEmpty())
-                return "Never expires";
+                return getString(R.string.default_expiration);
 
             value = value.trim().toLowerCase();
             if (!value.matches("^\\d+[mhd]?$"))
-                return "Invalid format";
+                return getString(R.string.invalid_expiration);
 
             char unit = value.charAt(value.length() - 1);
             int num;
@@ -156,7 +180,7 @@ public class SettingsActivity extends AppCompatActivity {
                 case 'd':
                     return num + " day" + (num != 1 ? "s" : "");
                 default:
-                    return "Never expires";
+                    return getString(R.string.default_expiration);
             }
         }
     }

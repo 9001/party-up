@@ -25,17 +25,29 @@
 
         <SwitchPreference
             android:defaultValue="false"
-            android:key="autosend"
+            android:key="be_silent"
+            android:title="Don't Bother"
+            android:summary="Upload in background" />
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="auto_send"
             android:title="Just go"
             app:summary="Skip confirmation screen" />
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="be_annoying"
+            android:title="Annoy me"
+            android:summary="Gonna annoy you ;)"
+            android:dependency="be_silent"/>
         <ListPreference
             android:defaultValue="close"
-            android:entries="@array/vonsuccess"
-            android:entryValues="@array/konsuccess"
             android:key="on_up_ok"
+            android:entries="@array/on_success_action_value"
+            android:entryValues="@array/on_success_action_key"
             android:title="On upload success..."
             app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+
     <PreferenceCategory android:title="Share links">
         <SwitchPreference
             android:defaultValue="false"
@@ -53,13 +65,6 @@
             android:title="Default password"
             android:dependency="use_share_url"
             app:useSimpleSummaryProvider="true" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="Experimental">
-        <SwitchPreference
-            android:defaultValue="false"
-            android:key="use_service"
-            android:title="Use Service"
-            android:summary="Run upload in a background service (Working)" />
     </PreferenceCategory>
     <PreferenceCategory android:title="UI">
         <SwitchPreference

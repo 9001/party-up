@@ -7,6 +7,8 @@ import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
 import androidx.core.util.Consumer;
 
 import java.io.InputStream;
@@ -16,13 +18,16 @@ import java.util.Locale;
 
 import me.ocv.partyup.objects.CustomFile;
 
-public class Discovery {
+public final class Analyzer {
+    private static final String TAG = "Analyzer";
+
     private Context context;
     private Consumer<String> onError;
 
-    public CustomFile[] parseIntent(
+    @NonNull
+    public CustomFile[] analyze(
             Context context,
-            Intent intent,
+            @NonNull Intent intent,
             Consumer<String> onError) {
 
         this.onError = onError;
@@ -141,7 +146,7 @@ public class Discovery {
                         cf.size = cur.getLong(iSize);
                 }
             } catch (Exception ex) {
-                Log.w("Discovery", "Content Resolver: " + ex);
+                Log.w(TAG, "Content Resolver: " + ex);
             }
         }
 
@@ -151,7 +156,7 @@ public class Discovery {
             try {
                 md = MessageDigest.getInstance("SHA512");
             } catch (Exception e) {
-                Log.e("Discovery", "Unable to get MD Instance");
+                Log.e(TAG, "Unable to get MD Instance");
             }
         }
 
@@ -183,10 +188,6 @@ public class Discovery {
             cf.name = String.format("mystery-file-%s.%s", cSum, cf.ext);
         }
 
-        cf.desc = String.format(Locale.getDefault(),
-                "%s\n\nsize: %,d byte\ntype: %s",
-                cf.name,
-                cf.size,
-                cf.mime);
+        cf.desc = String.format(Locale.getDefault(), "%s\n\nsize: %,d byte\ntype: %s", cf.name, cf.size, cf.mime);
     }
 }

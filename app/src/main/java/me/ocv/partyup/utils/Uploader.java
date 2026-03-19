@@ -23,7 +23,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import me.ocv.partyup.objects.CustomFile;
-import me.ocv.partyup.objects.UploadProgress;
+import me.ocv.partyup.objects.BaseUploadProgress;
 
 public class Uploader {
     private static final String TAG = "Uploader";
@@ -31,9 +31,9 @@ public class Uploader {
     private String serverUrl;
     private String password;
     private Consumer<Throwable> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
-    private Consumer<UploadProgress> onProgress = (progress) -> Log.i(TAG, String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
-    private Runnable onInit = () -> Log.d(TAG, "Uploading started!");
-    private Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
+    private Consumer<BaseUploadProgress> onProgress = (progress) -> Log.i(TAG, String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
+    private final Runnable onInit = () -> Log.d(TAG, "Uploading started!");
+    private final Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
     private Context context;
 
     private boolean uploadFile(@NonNull CustomFile cf, HttpURLConnection conn) throws Exception {
@@ -57,7 +57,7 @@ public class Uploader {
 
             byte[] buf = new byte[128 * 1024];
 
-            UploadProgress up = new UploadProgress();
+            BaseUploadProgress up = new BaseUploadProgress();
             up.total = cf.size;
             up.done = 0;
             up.delta = 0;
@@ -105,7 +105,7 @@ public class Uploader {
         this.onInit.run();
         Log.d(TAG, "[POST] Body creation successful: " + body.length);
 
-        UploadProgress up = new UploadProgress();
+        BaseUploadProgress up = new BaseUploadProgress();
         up.delta = body.length;
         up.total = body.length;
         up.done = body.length;
@@ -134,7 +134,7 @@ public class Uploader {
         return true;
     }
 
-    public boolean upload(CustomFile cf) throws Exception {
+    public void upload(CustomFile cf) throws Exception {
         HttpURLConnection conn = makeConnection(cf);
         cf.full_url = conn.getURL().toString();
 
@@ -153,7 +153,6 @@ public class Uploader {
 
         Log.i(TAG, String.format("Uploader result: %s", uploadSuccess));
         conn.disconnect();
-        return uploadSuccess;
     }
 
     @NonNull
@@ -224,20 +223,12 @@ public class Uploader {
         this.context = con;
     }
 
-    public void setOnProgress(Consumer<UploadProgress> onProc) {
+    public void setOnProgress(Consumer<BaseUploadProgress> onProc) {
         this.onProgress = onProc;
     }
 
     public void setOnError(Consumer<Throwable> onErr) {
         this.onError = onErr;
-    }
-
-    public void setOnInit(Runnable onInit) {
-        this.onInit = onInit;
-    }
-
-    public void setOnComplete(Runnable onComplete) {
-        this.onComplete = onComplete;
     }
 
     public String getServerUrl() {
@@ -263,10 +254,6 @@ public class Uploader {
         }
 
         Log.d(TAG, "Server Url: " + this.serverUrl);
-    }
-
-    public String getPassword() {
-        return this.password;
     }
 
     public void setPassword(String pass) {

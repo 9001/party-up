@@ -3,8 +3,10 @@ package me.ocv.partyup;
 import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -12,6 +14,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MenuItem;
@@ -19,15 +22,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.StyleRes;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
-import androidx.core.util.Consumer;
 import androidx.preference.PreferenceManager;
 
 import com.google.zxing.BarcodeFormat;
@@ -45,40 +46,73 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
 import me.ocv.partyup.objects.CustomFile;
-import me.ocv.partyup.objects.Progress;
-import me.ocv.partyup.objects.UploadProgress;
-import me.ocv.partyup.utils.Discovery;
+import me.ocv.partyup.objects.PrefsKey;
+import me.ocv.partyup.utils.Analyzer;
+import me.ocv.partyup.utils.NumberUtils;
 import me.ocv.partyup.utils.PermissionUtils;
 import me.ocv.partyup.utils.Uploader;
 import me.ocv.partyup.utils.UploaderService;
 
 public class XferActivity extends AppCompatActivity {
     private static final String TAG = "TransferActivity";
-    private final Progress progress = new Progress();
-    private final Discovery discovery = new Discovery();
+
+    private final DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.DEFAULT, Locale.getDefault());
+    private final DateFormat timeFormat = DateFormat.getTimeInstance(DateFormat.DEFAULT, Locale.getDefault());
+
+    private final Analyzer analyzer = new Analyzer();
     private final Uploader uploader = new Uploader();
 
     private ActivityXferBinding binding;
     private SharedPreferences prefs;
+    private UploaderService mService;
 
-    private String base_url;
-    private String password;
+    private String serverUrl;
+    private String serverPas;
+    private CustomFile[] filesToUpload;
 
-    private Boolean uploaded;
-    private Boolean upping;
-    private Boolean autosend;
-    private CustomFile[] files;
+    private boolean isUploaded;
+    private boolean isUploading;
+    private boolean autoSend;
+    private boolean beSilent;
+
+    private long startedAt = System.currentTimeMillis();
+    private Date startedOn = new Date(startedAt);
+
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            UploaderService.UploadBinder binder = (UploaderService.UploadBinder) iBinder;
+            mService = binder.getService();
+            if (filesToUpload != null && mService.isQueueEmpty()) {
+                mService.enqueueFiles(filesToUpload);
+            }
+
+            if (!beSilent) {
+                mService.addProgressListener(p -> runOnUiThread(() -> handleProgress(p)));
+                mService.addErrorListener(e -> runOnUiThread(() -> handleError(e)));
+            }
+
+            doUpload();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+        }
+    };
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
-            finishAndRemoveTask();
+            doLeave();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -87,193 +121,235 @@ public class XferActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (mService != null) {
+            mService.refreshPrefs();
+        }
         loadPrefs();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Intent intent = new Intent(this, UploaderService.class);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getApplicationContext().startForegroundService(intent);
+        } else {
+            getApplicationContext().startService(intent);
+        }
+
+        bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        if (!PermissionUtils.hasAllPermissions(this)) PermissionUtils.requestAllPermissions(this);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (connection != null) unbindService(connection);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (!PermissionUtils.hasAllPermissions(this)) PermissionUtils.requestAllPermissions(this);
+        binding = ActivityXferBinding.inflate(getLayoutInflater());
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        upping = false;
-        uploaded = false;
 
-        files = discovery.parseIntent(this, getIntent(), (e) -> Log.e(TAG, e));
+        doInit();
+        loadPrefs();
+        doUpload();
 
-        for (CustomFile cf : files) {
-            if (cf.size != null && cf.size > 0) {
-                progress.total += cf.size;
+        setContentView(binding.getRoot());
+        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        doUI();
+    }
+
+    private void doInit() {
+        isUploaded = false;
+        filesToUpload = analyzer.analyze(this, getIntent(), (e) -> Log.e(TAG, e));
+
+        // Grant URI permissions for all files
+        for (CustomFile cf : filesToUpload) {
+            if (cf.handle != null) {
+                grantUriPermission(getPackageName(), cf.handle, Intent.FLAG_GRANT_READ_URI_PERMISSION);
             }
         }
-
-        binding = ActivityXferBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-
-        if (getSupportActionBar() != null) getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        setButtons();
     }
 
     private void loadPrefs() {
-        AppCompatDelegate.setDefaultNightMode(prefs.getBoolean("dark_mode", false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
+        boolean darkMode = prefs.getBoolean(PrefsKey.DARK_MODE, false);
+        AppCompatDelegate.setDefaultNightMode(darkMode ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
 
-        if (!uploaded) {
-            autosend = prefs.getBoolean("autosend", false);
-            base_url = prefs.getString("server_url", "");
-            password = prefs.getString("server_password", "");
-            if (password != null && (password.isEmpty() || password.equals("Default value"))) password = null;
+        autoSend = prefs.getBoolean(PrefsKey.AUTOSEND, false);
+        serverUrl = prefs.getString(PrefsKey.SERVER_URL, "");
+        serverPas = prefs.getString(PrefsKey.SERVER_PASSWORD, "");
+        beSilent = prefs.getBoolean(PrefsKey.BE_SILENT, false);
+        showMessage(getString(R.string.xfer_loading));
+    }
 
-            uploader.setContext(this);
-            uploader.setPassword(password);
-            uploader.setServerUrl(base_url);
+    private void doUpload() {
+        if (!isUploaded && !isUploading) {
+            if (beSilent && mService != null) {
+                if (prefs.getBoolean(PrefsKey.ANNOY_ME, false)) {
+                    long[] lastSeen = {0};
+                    mService.addProgressListener(p -> mService.getHandler().post(() -> {
+                        long now = System.currentTimeMillis();
 
-            if (autosend) doUp();
-            else showShareSettings();
+                        if (now - lastSeen[0] > 1000) {
+                            lastSeen[0] = now;
+                            Toast.makeText(mService, p.smallProgress(), Toast.LENGTH_SHORT).show();
+                        }
+                    }));
+                    mService.addErrorListener(e -> mService.getHandler().post(() -> Toast.makeText(getApplicationContext(), String.format("Error: %s", e.getLocalizedMessage()), Toast.LENGTH_LONG).show()));
+                }
+
+                mService.startUploading();
+                doLeave();
+            } else if (autoSend && mService != null) {
+                mService.startUploading();
+                startedAt = System.currentTimeMillis();
+                startedOn = new Date(startedAt);
+                isUploading = true;
+            } else {
+                binding.getRoot().post(this::showShareSettings);
+            }
         }
     }
 
-    private void setButtons() {
+    private void doUI() {
+        // Addition binding configuration
+        binding.progressBar.setMax(100);
+        binding.upperInfo.setGravity(Gravity.CENTER);
+
         binding.actionConfig.setOnClickListener(v -> XferActivity.this.startActivity(new Intent(this, SettingsActivity.class)));
 
         binding.actionSend.setOnClickListener(v -> {
             binding.actionSend.setVisibility(View.GONE);
             binding.actionConfig.setVisibility(View.GONE);
 
-            doUp();
+            mService.startUploading();
         });
 
         binding.btnQrCode.setEnabled(false);
         binding.btnShareLink.setEnabled(false);
         binding.btnCopyLink.setEnabled(false);
         binding.btnExit.setOnClickListener(v -> finishAndRemoveTask());
+
+        binding.successButtons.setVisibility(View.GONE);
     }
 
-    private void doUp() {
-        if (upping) return;
-        upping = true;
+    private void doLeave() {
+        this.finishAndRemoveTask();
+    }
 
-        binding.actionSend.setEnabled(false);
-        binding.actionConfig.setEnabled(false);
+    private void displayText(String message, @NonNull MESSAGE_KIND kind) {
+        @StyleRes int resId;
 
-        if (prefs.getBoolean("use_service", false)) {
-            startUploaderService();
+        switch (kind) {
+            case NORMAL:
+                resId = R.style.TextAppearance_PartyUP_Normal;
+                break;
+            case SUCCESS:
+                resId = R.style.TextAppearance_PartyUP_Success;
+                break;
+            case ERROR:
+                resId = R.style.TextAppearance_PartyUP_Error;
+                break;
+            default:
+                return;
+        }
+
+        binding.getRoot().post(() -> {
+            binding.upperInfo.setTextAppearance(XferActivity.this, resId);
+            binding.upperInfo.setText(message);
+        });
+    }
+
+    private void showError(Throwable error) {
+        displayText(error != null ? error.getLocalizedMessage() : "Unexpected Error!", MESSAGE_KIND.ERROR);
+    }
+
+    private void showSuccess(String message) {
+        displayText(message, MESSAGE_KIND.SUCCESS);
+    }
+
+    private void showMessage(String message) {
+        displayText(message, MESSAGE_KIND.NORMAL);
+    }
+
+    private void handleProgress(UploaderService.UploadProgress progress) {
+        if (mService.isDone() || progress.doneBytes >= progress.totalBytes) {
+            handleSuccess();
         } else {
-            new Thread(this::doUp2).start();
+            showMessage(consumeProgress(progress));
+            binding.progressBar.setProgress((int) Math.floor(NumberUtils.calcPercentage(progress.doneBytes, progress.totalBytes)));
         }
     }
 
-    private void startUploaderService() {
-        Intent intent = new Intent(this, UploaderService.class);
-        intent.putExtra("base_url", base_url);
-        intent.putExtra("password", password);
-        intent.putExtra("files", files);
-        
-        // Grant URI permissions for all files
-        for (CustomFile file : files) {
-            if (file.handle != null) {
-                grantUriPermission(getPackageName(), file.handle, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
+    private void handleError(Throwable error) {
+        showError(error);
+
+        binding.getRoot().post(() -> {
+            binding.actionSend.setEnabled(true);
+            binding.actionConfig.setEnabled(true);
+            binding.actionSend.setVisibility(View.VISIBLE);
+            binding.actionConfig.setVisibility(View.VISIBLE);
+
+            binding.successButtons.setVisibility(View.GONE);
+        });
+
+        isUploading = false;
+        isUploaded = false;
+        Log.e(TAG, "Upload failed due to service error", mService.getLastError());
+    }
+
+    private void handleSuccess() {
+        showSuccessScreen();
+
+        binding.getRoot().post(() -> {
+            binding.actionConfig.setVisibility(View.VISIBLE);
+            binding.actionSend.setVisibility(View.GONE);
+
+            binding.actionConfig.setEnabled(true);
+            binding.successButtons.setVisibility(View.VISIBLE);
+        });
+
+        isUploading = false;
+        isUploaded = true;
+        postUploadSuccess();
+    }
+
+    @NonNull
+    private String consumeProgress(@NonNull UploaderService.UploadProgress ps) {
+        String header = String.format("Sending to: %s...", serverUrl);
+
+        List<String> fileInfo = new ArrayList<>();
+        fileInfo.add(String.format(Locale.getDefault(), "File: %d of %d", ps.currentIndex + 1, ps.totalFiles));
+        fileInfo.add(String.format(Locale.getDefault(), "Title: %s", ps.currentFile.name));
+        fileInfo.add(String.format(Locale.getDefault(), "Size: %s (%d)", NumberUtils.formatBytes(ps.currentFile.size != null ? ps.currentFile.size : 0), ps.currentFile.size != null ? ps.currentFile.size : 0));
+        fileInfo.add(String.format(Locale.getDefault(), "ContentType: %s", ps.currentFile.mime));
+
+        double speed;
+        if (startedAt == 0 || ps.doneBytes == 0) {
+            speed = 0.0f;
         } else {
-            startService(intent);
+            double seconds = (System.currentTimeMillis() - startedAt) / 1000.0f;
+            speed = seconds > 0 ? ps.doneBytes / seconds : 0.0f;
         }
-        
-        Toast.makeText(this, "Upload started in background", Toast.LENGTH_SHORT).show();
-        finish();
-    }
 
-    private void doUp2() {
-        Consumer<Throwable> onError = (err) -> {
-            Log.e(TAG, err.toString());
-            tShowMsg("Error: " + err + "\n\nMaybe wrong password?");
-
-            binding.getRoot().post(() -> {
-                binding.actionSend.setEnabled(true);
-                binding.actionConfig.setEnabled(true);
-                binding.actionSend.setVisibility(View.VISIBLE);
-                binding.actionConfig.setVisibility(View.VISIBLE);
-            });
-        };
-
-        try {
-            progress.t0 = System.currentTimeMillis();
-
-            final TextView tv = binding.upperInfo;
-            final ProgressBar pb = binding.progressBar;
-
-            class ProgressStats {
-                // Set default so it doesn't freak out
-                public long done = 0;
-                public int file = 0;
-                public int total_file = files.length;
-            }
-
-            final Consumer<ProgressStats> onProgress = (ps) -> {
-                try {
-                    tv.post(() -> {
-                        progress.done = ps.done;
-                        int file = ps.file;
-                        int total_file = ps.total_file;
-
-                        tv.setText(String.join("\n\n", String.format("Sending to: %s...", base_url), String.format(Locale.getDefault(), "File: %d of %d\nDesc: %s", file + 1, total_file, files[file].desc), progress.stats()));
-                        pb.setProgress(progress.perc());
-                    });
-                } catch (Exception e) {
-                    Log.e(TAG, "Issue in ui updating: " + e);
-                }
-            };
-
-            uploader.setOnError(onError);
-
-            final ProgressStats ps = new ProgressStats();
-            ps.total_file = files.length;
-
-            for (int i = 0; i < files.length; i++) {
-                CustomFile file = files[i];
-                ps.file = i;
-
-                Consumer<UploadProgress> onPro = (up) -> {
-                    ps.done += up.delta;
-                    onProgress.accept(ps);
-                };
-
-                uploader.setOnProgress(onPro);
-                boolean uploaded = uploader.upload(file);
-                if (!uploaded) {
-                    return;
-                }
-            }
-
-            // Handle creation of share url in `onSuccess`
-            uploaded = true;
-            binding.upperInfo.post(this::onSuccess);
-        } catch (Throwable ex) {
-            onError.accept(ex);
-        } finally {
-            upping = false;
-        }
-    }
-
-    public void showMsg(String txt) {
-        if (txt.startsWith("Error")) {
-            binding.upperInfo.setTextAppearance(
-                    binding.upperInfo.getContext(),
-                    R.style.TextAppearance_PartyUP_Error
-            );
+        double eta;
+        if (speed <= 0) {
+            eta = -1;
         } else {
-            binding.upperInfo.setTextAppearance(
-                    binding.upperInfo.getContext(),
-                    R.style.TextAppearance_PartyUP_Normal
-            );
+            eta = (double) Math.max(0, ps.totalBytes - ps.doneBytes) / speed;
         }
 
-        binding.upperInfo.setText(txt);
-    }
+        List<String> progressInfo = new ArrayList<>();
+        progressInfo.add(String.format(Locale.getDefault(), "Progress: %d/%d (%.1f%%)", ps.doneBytes, ps.totalBytes, NumberUtils.calcPercentage(ps.doneBytes, ps.totalBytes)));
+        progressInfo.add(String.format(Locale.getDefault(), "Speed: %.2f KiB/s", speed / 1024.0f));
+        progressInfo.add(String.format(Locale.getDefault(), "ETA: %.2fs", eta));
+        progressInfo.add(String.format(Locale.getDefault(), "Started At: %s on %s", dateFormat.format(startedOn), timeFormat.format(startedOn)));
 
-    public void tShowMsg(String txt) {
-        binding.upperInfo.post(() -> showMsg(txt));
+        return String.join("\n\n", header, "---------------", String.join("\n", fileInfo), "---------------", String.join("\n", progressInfo));
     }
 
     @NonNull
@@ -281,7 +357,7 @@ public class XferActivity extends AppCompatActivity {
         List<String> messages = new ArrayList<>();
 
         int counter = 1;
-        for (CustomFile cf : files) {
+        for (CustomFile cf : filesToUpload) {
             if (counter > 10) break;
 
             if (!cf.mime.equals("text/plain") || cf.content == null) continue;
@@ -290,7 +366,7 @@ public class XferActivity extends AppCompatActivity {
             counter++;
         }
 
-        String header = String.format("Post%s the following link%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "", autosend ? ":" : "?");
+        String header = String.format("Post%s the following link%s%s", autoSend ? "ing" : "", counter > 1 ? "s" : "", autoSend ? ":" : "?");
         return counter == 1 ? "" : String.join("\n\n", header, String.join("\n", messages), counter > 10 ? "[...]" : "");
     }
 
@@ -298,62 +374,63 @@ public class XferActivity extends AppCompatActivity {
     private String getFileBody() {
         List<String> filenames = new ArrayList<>();
         int counter = 1;
-        for (CustomFile file : files) {
+        for (CustomFile file : filesToUpload) {
             if (counter > 10) break;
 
             if (file.mime.equals("text/plain") || file.size == null) continue;
 
-            filenames.add(String.format(Locale.getDefault(), "%d. %s [%s]", counter, file.name, Progress.formatBytes(file.size)));
+            filenames.add(String.format(Locale.getDefault(), "%d. %s [%s]", counter, file.name, NumberUtils.formatBytes(file.size != null ? file.size : 0)));
             counter++;
         }
 
-        String header = String.format("Upload%s the following file%s%s", autosend ? "ing" : "", counter > 1 ? "s" : "", autosend ? ":" : "?");
+        String header = String.format("Upload%s the following file%s%s", autoSend ? "ing" : "", counter > 1 ? "s" : "", autoSend ? ":" : "?");
         return counter == 1 ? "" : String.join("\n\n", header, String.join("\n", filenames), counter > 10 ? "[...]" : "");
     }
 
     public void showShareSettings() {
-        if (prefs.getBoolean("use_share_url", false)) {
+        if (prefs.getBoolean(PrefsKey.USE_SHARE_URL, false)) {
             binding.shareSettings.setVisibility(View.VISIBLE);
 
             EditText expField = binding.shareExpiration;
             EditText pwField = binding.sharePassword;
 
-            String defaultExp = prefs.getString("link_expiration", "");
-            String defaultPw = prefs.getString("share_password", "");
+            String defaultExp = prefs.getString(PrefsKey.LINK_EXPIRATION, "");
+            String defaultPw = prefs.getString(PrefsKey.SHARE_PASSWORD, "");
 
             expField.setText(defaultExp);
             pwField.setText(defaultPw);
         }
 
-        String header = "Hi, Welcome to PartyUP!";
-        String body = String.join("\n", "You are uploading to:", base_url, getTextBody(), getFileBody(), (!autosend ? "Press the button to upload!" : "Starting..."));
-        String footer = String.join("\n", String.format(Locale.getDefault(), "Total files: %d", files.length), String.format("Total size: %s", Progress.formatBytes(progress.total)));
+        String header = getString(R.string.greetings);
+        String body = String.join("\n", "You are uploading to:", serverUrl, getTextBody(), getFileBody(), (!autoSend ? "Press the button to upload!" : "Starting..."));
+        String footer = String.join("\n", String.format(Locale.getDefault(), "Total files: %d", filesToUpload.length), String.format("Total size: %s", NumberUtils.formatBytes(NumberUtils.sumSize(filesToUpload))));
 
         String fullBody = String.join("\n\n", header, body, footer);
-        showMsg(fullBody);
+        showMessage(fullBody);
     }
 
-    public void onSuccess() {
-        String msg = "✅👍\n\nCompleted successfully";
-        final String share_url = createShareUrl();
-        String footer = String.format(Locale.getDefault(), "Total file uploaded: %d (%s)", files.length, Progress.formatBytes(progress.total));
-
-        showMsg(String.join("\n", msg, share_url, footer));
+    private void showSuccessScreen() {
+        String msg = getString(R.string.complete_text);
+        String footer = String.format(Locale.getDefault(), "Total file uploaded: %d (%s)", filesToUpload.length, NumberUtils.formatBytes(NumberUtils.sumSize(filesToUpload)));
+        showSuccess(String.join("\n", msg, footer));
         binding.upperInfo.setGravity(Gravity.CENTER);
+    }
 
-        if (share_url.isEmpty()) {
-            Toast.makeText(getApplicationContext(), "Share Failed!", Toast.LENGTH_SHORT).show();
+    private void postUploadSuccess() {
+        String share_url = createShareUrl();
+        if (share_url == null || share_url.isEmpty()) {
+            Toast.makeText(getApplicationContext(), R.string.share_failed_text, Toast.LENGTH_SHORT).show();
             return;
         }
 
-        String act = prefs.getString("on_up_ok", "menu");
+        String act = prefs.getString(PrefsKey.ON_UP_OK, "menu");
+
         if (!act.equals("menu")) {
             if (act.equals("copy")) copyLink(share_url);
             else if (act.equals("share")) shareLink(share_url);
-            else Toast.makeText(getApplicationContext(), "Upload OK", Toast.LENGTH_SHORT).show();
+            else Toast.makeText(this, R.string.upload_ok, Toast.LENGTH_SHORT).show();
 
-            XferActivity.this.finishAndRemoveTask();
-            return;
+            doLeave();
         }
 
         binding.progressBar.setVisibility(View.GONE);
@@ -379,29 +456,29 @@ public class XferActivity extends AppCompatActivity {
 
         if (!share_url.isEmpty()) sb.append(share_url);
 
-        for (CustomFile file : files) {
+        for (CustomFile file : filesToUpload) {
             String bestUrl = file.getBestUrl();
             if (file.getBestUrl().isEmpty()) continue;
             sb.append(bestUrl);
         }
 
         ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData cd = ClipData.newPlainText("copyparty upload", sb);
+        ClipData cd = ClipData.newPlainText(getString(R.string.clipboard_label), sb);
         cb.setPrimaryClip(cd);
-        Toast.makeText(getApplicationContext(), "Upload OK -- Link copied", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getApplicationContext(), R.string.copy_success, Toast.LENGTH_SHORT).show();
     }
 
     private void shareLink(String share_url) {
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType("text/plain");
         send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        send.putExtra(Intent.EXTRA_SUBJECT, "Uploaded file");
+        send.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_extra_text));
         send.putExtra(Intent.EXTRA_TEXT, share_url);
 
         Intent view = new Intent(Intent.ACTION_VIEW);
         view.setData(Uri.parse(share_url));
 
-        Intent i = Intent.createChooser(send, "Share file link");
+        Intent i = Intent.createChooser(send, getString(R.string.share_link_title));
         i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{view});
         startActivity(i);
     }
@@ -432,7 +509,7 @@ public class XferActivity extends AppCompatActivity {
             ImageDialog.show();
         } catch (WriterException e) {
             Toast.makeText(this, e.getLocalizedMessage(), Toast.LENGTH_LONG).show();
-            Log.e("Xfer", "Unable to show QR", e);
+            Log.e(TAG, "Unable to show QR", e);
         }
     }
 
@@ -440,7 +517,7 @@ public class XferActivity extends AppCompatActivity {
     private CustomFile[] getWantedFiles() {
         ArrayList<CustomFile> needed = new ArrayList<>();
 
-        for (CustomFile file : files) {
+        for (CustomFile file : filesToUpload) {
             if (file.isSharable()) needed.add(file);
         }
 
@@ -453,8 +530,8 @@ public class XferActivity extends AppCompatActivity {
             CustomFile[] wantedFiles = getWantedFiles();
 
             if (wantedFiles.length == 0) {
-                return files[0].share_url;
-            } else if ((files.length - wantedFiles.length) < 2) {
+                return filesToUpload[0].share_url;
+            } else if ((filesToUpload.length - wantedFiles.length) < 2) {
                 for (CustomFile file : wantedFiles) {
                     String bestUrl = file.getBestUrl();
                     if (bestUrl.isEmpty()) continue;
@@ -483,7 +560,7 @@ public class XferActivity extends AppCompatActivity {
                 }
 
                 sharedFilesPaths.append("\"").append(filePath).append("\"");
-                if (i < files.length - 1) {
+                if (i < filesToUpload.length - 1) {
                     sharedFilesPaths.append(",");
                 }
             }
@@ -492,48 +569,56 @@ public class XferActivity extends AppCompatActivity {
                 throw new Exception("No media/file type found in shared items");
             }
 
-            return getSharableUrl(key, sharedFilesPaths, sharePw, expiration, shareApiUri);
+            AtomicReference<String> shareUrl = new AtomicReference<>();
+
+            new Thread(() -> shareUrl.set(getSharableUrl(key, sharedFilesPaths, sharePw, expiration, shareApiUri))).join();
+            return shareUrl.get();
         } catch (Exception ex) {
-            Log.w(TAG, "Share creation error: " + ex);
+            Toast.makeText(this, String.format("X Share: %s", ex.getLocalizedMessage()), Toast.LENGTH_LONG).show();
+            Log.e(TAG, "Share creation error: " + ex);
         }
 
         return "";
     }
 
     @NonNull
-    private String getSharableUrl(String key, StringBuilder sharedFilesPaths, String sharePw, String expiration, @NonNull Uri shareApiUri) throws Exception {
+    private String getSharableUrl(String key, StringBuilder sharedFilesPaths, String sharePw, String expiration, @NonNull Uri shareApiUri) {
+        try {
+            String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}", key, sharedFilesPaths, sharePw, expiration);
 
-        String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}", key, sharedFilesPaths, sharePw, expiration);
+            HttpURLConnection conn = (HttpURLConnection) (new URL(shareApiUri.getScheme() + "://" + shareApiUri.getAuthority() + "/")).openConnection();
+            conn.setDoOutput(true);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "text/plain");
+            if (serverPas != null) conn.setRequestProperty("PW", serverPas);
 
-        HttpURLConnection conn = (HttpURLConnection) (new URL(shareApiUri.getScheme() + "://" + shareApiUri.getAuthority() + "/")).openConnection();
-        conn.setDoOutput(true);
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "text/plain");
-        if (password != null) conn.setRequestProperty("PW", password);
+            byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
+            conn.setFixedLengthStreamingMode(body.length);
+            conn.connect();
 
-        byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
-        conn.setFixedLengthStreamingMode(body.length);
-        conn.connect();
+            OutputStream os = conn.getOutputStream();
+            os.write(body);
+            os.flush();
 
-        OutputStream os = conn.getOutputStream();
-        os.write(body);
-        os.flush();
+            int rc = conn.getResponseCode();
+            if (rc >= 300) {
+                Log.w(TAG, "Share creation failed: " + rc);
+                conn.disconnect();
+                throw new RuntimeException("Unable to get share url!");
+            }
 
-        int rc = conn.getResponseCode();
-        if (rc >= 300) {
-            Log.w(TAG, "Share creation failed: " + rc);
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            String response = br.readLine();
             conn.disconnect();
-            throw new RuntimeException("Unable to get share url!");
+
+            if (response != null && response.startsWith("created share: "))
+                return response.substring(15);
+
+            return "";
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to get sharable url from server", e);
+            throw new RuntimeException(e);
         }
-
-        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String response = br.readLine();
-        conn.disconnect();
-
-        if (response != null && response.startsWith("created share: "))
-            return response.substring(15);
-
-        return "";
     }
 
     @Override
@@ -606,4 +691,7 @@ public class XferActivity extends AppCompatActivity {
         return key.toString();
     }
 
+    private enum MESSAGE_KIND {
+        SUCCESS, ERROR, NORMAL
+    }
 }

@@ -9,22 +9,6 @@ import androidx.annotation.NonNull;
 import org.jetbrains.annotations.Contract;
 
 public class CustomFile implements Parcelable {
-    public static final Creator<CustomFile> CREATOR = new Creator<CustomFile>() {
-        @NonNull
-        @Contract("_ -> new")
-        @Override
-        public CustomFile createFromParcel(Parcel in) {
-            return new CustomFile(in);
-        }
-
-        @NonNull
-        @Contract(value = "_ -> new", pure = true)
-        @Override
-        public CustomFile[] newArray(int size) {
-            return new CustomFile[size];
-        }
-    };
-
     public Uri handle;
     public Long size;
     public String name;
@@ -34,26 +18,6 @@ public class CustomFile implements Parcelable {
     public String content;
     public String mime;
     public String ext;
-
-    // Parcelable Implementations
-    public CustomFile() {
-    }
-
-    protected CustomFile(@NonNull Parcel in) {
-        handle = in.readParcelable(Uri.class.getClassLoader());
-        if (in.readByte() == 0) {
-            size = null;
-        } else {
-            size = in.readLong();
-        }
-        name = in.readString();
-        full_url = in.readString();
-        share_url = in.readString();
-        desc = in.readString();
-        content = in.readString();
-        mime = in.readString();
-        ext = in.readString();
-    }
 
     public boolean isSharable() {
         boolean hasUrl = (share_url != null && !share_url.isEmpty()) ||
@@ -88,6 +52,42 @@ public class CustomFile implements Parcelable {
                 ", mime=" + mime +
                 ", ext=" + ext +
                 '}';
+    }
+
+    // Parcelable Implementations
+    public static final Creator<CustomFile> CREATOR = new Creator<>() {
+        @NonNull
+        @Contract("_ -> new")
+        @Override
+        public CustomFile createFromParcel(Parcel in) {
+            return new CustomFile(in);
+        }
+
+        @NonNull
+        @Contract(value = "_ -> new", pure = true)
+        @Override
+        public CustomFile[] newArray(int size) {
+            return new CustomFile[size];
+        }
+    };
+
+    public CustomFile() {
+    }
+
+    protected CustomFile(@NonNull Parcel in) {
+        handle = in.readParcelable(Uri.class.getClassLoader());
+        if (in.readByte() == 0) {
+            size = null;
+        } else {
+            size = in.readLong();
+        }
+        name = in.readString();
+        full_url = in.readString();
+        share_url = in.readString();
+        desc = in.readString();
+        content = in.readString();
+        mime = in.readString();
+        ext = in.readString();
     }
 
     @Override
