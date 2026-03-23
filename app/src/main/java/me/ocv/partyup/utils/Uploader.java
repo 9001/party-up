@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.core.util.Consumer;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
@@ -18,22 +19,25 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.stream.Stream;
 
 import me.ocv.partyup.objects.CustomFile;
 import me.ocv.partyup.objects.BaseUploadProgress;
 
 public class Uploader {
     private static final String TAG = "Uploader";
+    private final Runnable onInit = () -> Log.d(TAG, "Uploading started!");
 
     private String serverUrl;
     private String password;
     private Consumer<Throwable> onError = (err) -> Log.e(TAG, "Upload error: " + err.toString());
     private Consumer<BaseUploadProgress> onProgress = (progress) -> Log.i(TAG, String.format(Locale.getDefault(), "Uploaded: %d/%d bytes (delta=%d)", progress.done, progress.total, progress.delta));
-    private final Runnable onInit = () -> Log.d(TAG, "Uploading started!");
-    private final Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
+    private Runnable onComplete = () -> Log.d(TAG, "Uploading completed!");
     private Context context;
 
     private boolean uploadFile(@NonNull CustomFile cf, HttpURLConnection conn) throws Exception {
@@ -78,7 +82,8 @@ public class Uploader {
             os.flush();
             int rc = conn.getResponseCode();
             if (rc >= 300) {
-                this.onError.accept(new RuntimeException("Server error " + rc + ":\n" + this.read_err(conn)));
+                String message = String.format(Locale.getDefault(), "[%d] Server error:\n%s", rc, Arrays.toString(readServerResponse(conn)));
+                this.onError.accept(new RuntimeException(message));
                 conn.disconnect();
                 return false;
             }
@@ -119,7 +124,8 @@ public class Uploader {
 
         int rc = conn.getResponseCode();
         if (rc >= 300) {
-            this.onError.accept(new RuntimeException("Server error " + rc + ":\n" + read_err(conn)));
+            String message = String.format(Locale.getDefault(), "[%d] Server error:\n%s", rc, Arrays.toString(readServerResponse(conn)));
+            this.onError.accept(new RuntimeException(message));
             conn.disconnect();
             return false;
         }
@@ -172,27 +178,33 @@ public class Uploader {
     }
 
     @NonNull
-    private String read_err(HttpURLConnection conn) {
-        try {
-            byte[] buf = new byte[1024];
-            int n = Math.max(0, conn.getErrorStream().read(buf));
-            return new String(buf, 0, n, StandardCharsets.UTF_8);
-        } catch (Exception ex) {
-            return ex.toString();
+    public static String[] readConnectionStream(InputStream inputStream) throws IOException {
+        if (inputStream == null) return new String[]{""};
+        try (BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream))) {
+            List<String> lines = new ArrayList<>();
+            String line;
+
+            do {
+                line = bufferedReader.readLine();
+                lines.add(line);
+            } while (line != null && !line.isBlank());
+
+            return lines.toArray(new String[0]);
         }
     }
 
     @NonNull
     private String[] readServerResponse(@NonNull HttpURLConnection conn) throws Exception {
-        BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-
-        ArrayList<String> linesList = new ArrayList<>();
-        String line;
-        while ((line = br.readLine()) != null) {
-            linesList.add(line);
+        InputStream is;
+        if (conn.getResponseCode() >= 400) {
+            is = conn.getErrorStream();
+            if (is == null) {
+                return new String[]{""};
+            }
+        } else {
+            is = conn.getInputStream();
         }
-
-        return linesList.toArray(new String[0]);
+        return readConnectionStream(is);
     }
 
     private boolean uploadSuccess(@NonNull MessageDigest md, HttpURLConnection conn, CustomFile cf) throws Exception {
@@ -227,6 +239,31 @@ public class Uploader {
         this.onProgress = onProc;
     }
 
+    public String post(String body) throws Exception {
+        String base = serverUrl + (serverUrl.endsWith("/") ? "" : "/") + "?share";
+        HttpURLConnection conn = (HttpURLConnection) new URL(base).openConnection();
+
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setDoInput(true);
+
+        if (this.password != null) {
+            conn.setRequestProperty("PW", this.password);
+        }
+
+        conn.setRequestProperty("Content-Type", "text/plain; charset=UTF-8");
+
+        byte[] data = body.getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(data.length);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(data);
+        }
+
+        String[] resp = readServerResponse(conn); // <-- better to pass stream, not conn
+        return String.join("\n", resp);
+    }
+
     public void setOnError(Consumer<Throwable> onErr) {
         this.onError = onErr;
     }
@@ -256,7 +293,12 @@ public class Uploader {
         Log.d(TAG, "Server Url: " + this.serverUrl);
     }
 
+    public String getServerPassword() { return this.password; }
     public void setPassword(String pass) {
         this.password = pass;
+    }
+
+    public void setOnComplete(Runnable onComplete) {
+        this.onComplete = onComplete;
     }
 }

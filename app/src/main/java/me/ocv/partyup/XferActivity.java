@@ -1,17 +1,11 @@
 package me.ocv.partyup;
 
-import android.Manifest;
-import android.content.ClipData;
-import android.content.ClipboardManager;
+import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -19,39 +13,22 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.StyleRes;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
-
-import com.google.zxing.BarcodeFormat;
-import com.google.zxing.WriterException;
-import com.google.zxing.common.BitMatrix;
-import com.google.zxing.qrcode.QRCodeWriter;
 
 import org.jetbrains.annotations.Contract;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicReference;
 
 import me.ocv.partyup.databinding.ActivityXferBinding;
 import me.ocv.partyup.objects.CustomFile;
@@ -59,7 +36,6 @@ import me.ocv.partyup.objects.PrefsKey;
 import me.ocv.partyup.utils.Analyzer;
 import me.ocv.partyup.utils.NumberUtils;
 import me.ocv.partyup.utils.PermissionUtils;
-import me.ocv.partyup.utils.Uploader;
 import me.ocv.partyup.utils.UploaderService;
 
 public class XferActivity extends AppCompatActivity {
@@ -69,18 +45,16 @@ public class XferActivity extends AppCompatActivity {
     private final DateFormat timeFormat = DateFormat.getTimeInstance(DateFormat.DEFAULT, Locale.getDefault());
 
     private final Analyzer analyzer = new Analyzer();
-    private final Uploader uploader = new Uploader();
 
     private ActivityXferBinding binding;
     private SharedPreferences prefs;
     private UploaderService mService;
 
     private String serverUrl;
-    private String serverPas;
+    private String shareUrl;
     private CustomFile[] filesToUpload;
 
     private boolean isUploaded;
-    private boolean isUploading;
     private boolean autoSend;
     private boolean beSilent;
 
@@ -99,6 +73,10 @@ public class XferActivity extends AppCompatActivity {
             if (!beSilent) {
                 mService.addProgressListener(p -> runOnUiThread(() -> handleProgress(p)));
                 mService.addErrorListener(e -> runOnUiThread(() -> handleError(e)));
+                mService.addSuccessListener(s -> {
+                    XferActivity.this.shareUrl = s.shareUrl;
+                    postUploadSuccess();
+                });
             }
 
             doUpload();
@@ -108,6 +86,60 @@ public class XferActivity extends AppCompatActivity {
         public void onServiceDisconnected(ComponentName componentName) {
         }
     };
+
+    public static String getExpiration(String expValue) {
+        int[] parsed = parseExpiration(expValue);
+        String expiration = "";
+        if (parsed[1] >= 0) {
+            int minutes = parsed[0];
+            if (parsed[1] == 1) minutes *= 60;
+            else if (parsed[1] == 2) minutes *= 1440;
+            expiration = String.valueOf(minutes);
+        }
+
+        return expiration;
+    }
+
+    @NonNull
+    @Contract("null -> new")
+    private static int[] parseExpiration(String value) {
+        if (value == null || value.trim().isEmpty()) return new int[]{0, -1};
+
+        value = value.trim().toLowerCase();
+        if (!value.matches("^\\d+[mhd]?$")) return new int[]{0, -1};
+
+        char unit = value.charAt(value.length() - 1);
+        int num;
+        int unitType;
+
+        if (Character.isDigit(unit)) {
+            num = Integer.parseInt(value);
+            unitType = 0; // minutes
+        } else {
+            num = Integer.parseInt(value.substring(0, value.length() - 1));
+            switch (unit) {
+                case 'h':
+                    unitType = 1;
+                    break;
+                case 'd':
+                    unitType = 2;
+                    break;
+                default:
+                    unitType = 0;
+                    break;
+            }
+        }
+        return new int[]{num, unitType};
+    }
+
+    public static String generateRandomKey() {
+        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder key = new StringBuilder();
+        for (int i = 0; i < 12; i++)
+            key.append(chars.charAt(random.nextInt(chars.length())));
+        return key.toString();
+    }
 
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
@@ -176,43 +208,53 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void loadPrefs() {
-        boolean darkMode = prefs.getBoolean(PrefsKey.DARK_MODE, false);
-        AppCompatDelegate.setDefaultNightMode(darkMode ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
-
         autoSend = prefs.getBoolean(PrefsKey.AUTOSEND, false);
         serverUrl = prefs.getString(PrefsKey.SERVER_URL, "");
-        serverPas = prefs.getString(PrefsKey.SERVER_PASSWORD, "");
         beSilent = prefs.getBoolean(PrefsKey.BE_SILENT, false);
-        showMessage(getString(R.string.xfer_loading));
+
+        if (filesToUpload == null || filesToUpload.length == 0) {
+            showMessage(getString(R.string.xfer_loading));
+        }
     }
 
     private void doUpload() {
-        if (!isUploaded && !isUploading) {
-            if (beSilent && mService != null) {
-                if (prefs.getBoolean(PrefsKey.ANNOY_ME, false)) {
-                    long[] lastSeen = {0};
-                    mService.addProgressListener(p -> mService.getHandler().post(() -> {
-                        long now = System.currentTimeMillis();
-
-                        if (now - lastSeen[0] > 1000) {
-                            lastSeen[0] = now;
-                            Toast.makeText(mService, p.smallProgress(), Toast.LENGTH_SHORT).show();
-                        }
-                    }));
-                    mService.addErrorListener(e -> mService.getHandler().post(() -> Toast.makeText(getApplicationContext(), String.format("Error: %s", e.getLocalizedMessage()), Toast.LENGTH_LONG).show()));
-                }
-
-                mService.startUploading();
-                doLeave();
-            } else if (autoSend && mService != null) {
-                mService.startUploading();
-                startedAt = System.currentTimeMillis();
-                startedOn = new Date(startedAt);
-                isUploading = true;
-            } else {
-                binding.getRoot().post(this::showShareSettings);
-            }
+        if (mService == null) {
+            binding.getRoot().post(this::showShareSettings);
+            return;
         }
+
+        if (mService.isUploading()) {
+            showMessage("Service is currently uploading...\nRetry again!");
+            return;
+        }
+
+        if (isUploaded) {
+//            showMessage("File Already uploaded!");
+            return;
+        }
+
+        if (beSilent) {
+            if (prefs.getBoolean(PrefsKey.ANNOY_ME, false)) {
+                long[] lastSeen = {0};
+                mService.addProgressListener(p -> mService.getHandler().post(() -> {
+                    long now = System.currentTimeMillis();
+
+                    if (now - lastSeen[0] > 1000) {
+                        lastSeen[0] = now;
+                        Toast.makeText(mService, p.smallProgress(), Toast.LENGTH_SHORT).show();
+                    }
+                }));
+                mService.addErrorListener(e -> mService.getHandler().post(() -> Toast.makeText(getApplicationContext(), String.format("Error: %s", e.getLocalizedMessage()), Toast.LENGTH_LONG).show()));
+            }
+            mService.startUploading();
+            doLeave();
+        } else if (autoSend) {
+            mService.startUploading();
+            startedAt = System.currentTimeMillis();
+            startedOn = new Date(startedAt);
+        }
+
+        binding.getRoot().post(this::showShareSettings);
     }
 
     private void doUI() {
@@ -223,10 +265,12 @@ public class XferActivity extends AppCompatActivity {
         binding.actionConfig.setOnClickListener(v -> XferActivity.this.startActivity(new Intent(this, SettingsActivity.class)));
 
         binding.actionSend.setOnClickListener(v -> {
-            binding.actionSend.setVisibility(View.GONE);
-            binding.actionConfig.setVisibility(View.GONE);
+            if (!mService.isUploading()) {
+                binding.actionSend.setVisibility(View.GONE);
+                binding.actionConfig.setVisibility(View.GONE);
 
-            mService.startUploading();
+                mService.startUploading();
+            }
         });
 
         binding.btnQrCode.setEnabled(false);
@@ -297,7 +341,6 @@ public class XferActivity extends AppCompatActivity {
             binding.successButtons.setVisibility(View.GONE);
         });
 
-        isUploading = false;
         isUploaded = false;
         Log.e(TAG, "Upload failed due to service error", mService.getLastError());
     }
@@ -313,7 +356,6 @@ public class XferActivity extends AppCompatActivity {
             binding.successButtons.setVisibility(View.VISIBLE);
         });
 
-        isUploading = false;
         isUploaded = true;
         postUploadSuccess();
     }
@@ -417,278 +459,70 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void postUploadSuccess() {
-        String share_url = createShareUrl();
-        if (share_url == null || share_url.isEmpty()) {
-            Toast.makeText(getApplicationContext(), R.string.share_failed_text, Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (shareUrl == null) return;
+        // This will never happen
+//        if (share_url == null || share_url.isEmpty()) {
+//            Toast.makeText(getApplicationContext(), R.string.share_failed_text, Toast.LENGTH_SHORT).show();
+//            return;
+//        }
+
+        Intent baseBeforeIntent = new Intent(this, XferAfterActivity.class);
+        baseBeforeIntent.putExtra(XferAfterActivity.SHARE_URL_KEY, shareUrl);
+
+        PendingIntent copyIntent = PendingIntent.getActivity(this, 1, new Intent(baseBeforeIntent).putExtra(XferAfterActivity.ACTION_KEY, XferAfterActivity.ActionType.ACTION_COPY), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        PendingIntent shareIntent = PendingIntent.getActivity(this, 2, new Intent(baseBeforeIntent).putExtra(XferAfterActivity.ACTION_KEY, XferAfterActivity.ActionType.ACTION_SHARE), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        PendingIntent showIntent = PendingIntent.getActivity(this, 3, new Intent(baseBeforeIntent).putExtra(XferAfterActivity.ACTION_KEY, XferAfterActivity.ActionType.ACTION_SHOW_QR), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         String act = prefs.getString(PrefsKey.ON_UP_OK, "menu");
 
-        if (!act.equals("menu")) {
-            if (act.equals("copy")) copyLink(share_url);
-            else if (act.equals("share")) shareLink(share_url);
-            else Toast.makeText(this, R.string.upload_ok, Toast.LENGTH_SHORT).show();
-
-            doLeave();
-        }
-
-        binding.progressBar.setVisibility(View.GONE);
-        binding.shareSettings.setVisibility(View.GONE);
-        binding.successButtons.setVisibility(View.VISIBLE);
-
-        binding.actionSend.setVisibility(View.GONE);
-        binding.actionConfig.setVisibility(View.VISIBLE);
-
-        binding.actionConfig.setEnabled(true);
-
-        binding.btnCopyLink.setEnabled(true);
-        binding.btnShareLink.setEnabled(true);
-        binding.btnQrCode.setEnabled(true);
-
-        binding.btnCopyLink.setOnClickListener(v -> copyLink(share_url));
-        binding.btnShareLink.setOnClickListener(v -> shareLink(share_url));
-        binding.btnQrCode.setOnClickListener(view -> showQr(share_url));
-    }
-
-    private void copyLink(@NonNull String share_url) {
-        StringBuilder sb = new StringBuilder();
-
-        if (!share_url.isEmpty()) sb.append(share_url);
-
-        for (CustomFile file : filesToUpload) {
-            String bestUrl = file.getBestUrl();
-            if (file.getBestUrl().isEmpty()) continue;
-            sb.append(bestUrl);
-        }
-
-        ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData cd = ClipData.newPlainText(getString(R.string.clipboard_label), sb);
-        cb.setPrimaryClip(cd);
-        Toast.makeText(getApplicationContext(), R.string.copy_success, Toast.LENGTH_SHORT).show();
-    }
-
-    private void shareLink(String share_url) {
-        Intent send = new Intent(Intent.ACTION_SEND);
-        send.setType("text/plain");
-        send.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        send.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.share_extra_text));
-        send.putExtra(Intent.EXTRA_TEXT, share_url);
-
-        Intent view = new Intent(Intent.ACTION_VIEW);
-        view.setData(Uri.parse(share_url));
-
-        Intent i = Intent.createChooser(send, getString(R.string.share_link_title));
-        i.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{view});
-        startActivity(i);
-    }
-
-    private void showQr(String share_url) {
         try {
-            QRCodeWriter qrCodeWriter = new QRCodeWriter();
-            int size = 256;
-            BitMatrix bitMatrix = qrCodeWriter.encode(share_url, BarcodeFormat.QR_CODE, size, size);
+            if (!act.equals("menu")) {
+                if (act.equals("copy")) copyIntent.send();
+                else if (act.equals("share")) shareIntent.send();
+                else Toast.makeText(this, R.string.upload_ok, Toast.LENGTH_SHORT).show();
 
-            Bitmap shareQr = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565);
+                doLeave();
+            }
 
-            for (int x = 0; x < size; x++) {
-                for (int y = 0; y < size; y++) {
-                    shareQr.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+            binding.progressBar.setVisibility(View.GONE);
+            binding.shareSettings.setVisibility(View.GONE);
+            binding.successButtons.setVisibility(View.VISIBLE);
+
+            binding.actionSend.setVisibility(View.GONE);
+            binding.actionConfig.setVisibility(View.VISIBLE);
+
+            binding.actionConfig.setEnabled(true);
+
+            binding.btnCopyLink.setEnabled(true);
+            binding.btnShareLink.setEnabled(true);
+            binding.btnQrCode.setEnabled(true);
+
+            binding.btnCopyLink.setOnClickListener(v -> {
+                try {
+                    copyIntent.send();
+                } catch (PendingIntent.CanceledException e) {
+                    Log.e(TAG, "Button Copy Intent Cancelled", e);
                 }
-            }
-
-            AlertDialog.Builder ImageDialog = new AlertDialog.Builder(this);
-            ImageView shownImage = new ImageView(this);
-            shownImage.setImageBitmap(shareQr);
-            shownImage.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            shownImage.setAdjustViewBounds(true);
-
-            ImageDialog.setView(shownImage);
-
-            ImageDialog.show();
-        } catch (WriterException e) {
-            Toast.makeText(this, e.getLocalizedMessage(), Toast.LENGTH_LONG).show();
-            Log.e(TAG, "Unable to show QR", e);
-        }
-    }
-
-    @NonNull
-    private CustomFile[] getWantedFiles() {
-        ArrayList<CustomFile> needed = new ArrayList<>();
-
-        for (CustomFile file : filesToUpload) {
-            if (file.isSharable()) needed.add(file);
-        }
-
-        return needed.toArray(new CustomFile[0]);
-    }
-
-    @SuppressWarnings("CharsetObjectCanBeUsed")
-    public String createShareUrl() {
-        try {
-            CustomFile[] wantedFiles = getWantedFiles();
-
-            if (wantedFiles.length == 0) {
-                return filesToUpload[0].share_url;
-            } else if ((filesToUpload.length - wantedFiles.length) < 2) {
-                for (CustomFile file : wantedFiles) {
-                    String bestUrl = file.getBestUrl();
-                    if (bestUrl.isEmpty()) continue;
-                    return bestUrl;
+            });
+            binding.btnShareLink.setOnClickListener(v -> {
+                try {
+                    shareIntent.send();
+                } catch (PendingIntent.CanceledException e) {
+                    Log.e(TAG, "Button Share Intent Cancelled", e);
                 }
-                throw new Exception("Man don't know!");
-            }
-
-            String key = generateRandomKey();
-            Uri shareApiUri = Uri.parse(uploader.getServerUrl());
-
-            String expiration = getExpiration();
-            EditText pwField = binding.sharePassword;
-            String sharePw = pwField.getText().toString();
-
-            StringBuilder sharedFilesPaths = new StringBuilder();
-
-            for (int i = 0; i < wantedFiles.length; i++) {
-                CustomFile cf = wantedFiles[i];
-                String filePath;
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    filePath = URLDecoder.decode(new URL(cf.full_url).getPath(), StandardCharsets.UTF_8);
-                } else {
-                    filePath = URLDecoder.decode(new URL(cf.full_url).getPath(), "UTF-8");
+            });
+            binding.btnQrCode.setOnClickListener(view -> {
+                try {
+                    showIntent.send();
+                } catch (PendingIntent.CanceledException e) {
+                    Log.e(TAG, "Button QR Code Intent Cancelled", e);
                 }
-
-                sharedFilesPaths.append("\"").append(filePath).append("\"");
-                if (i < filesToUpload.length - 1) {
-                    sharedFilesPaths.append(",");
-                }
-            }
-
-            if (sharedFilesPaths.length() == 0) {
-                throw new Exception("No media/file type found in shared items");
-            }
-
-            AtomicReference<String> shareUrl = new AtomicReference<>();
-
-            new Thread(() -> shareUrl.set(getSharableUrl(key, sharedFilesPaths, sharePw, expiration, shareApiUri))).join();
-            return shareUrl.get();
-        } catch (Exception ex) {
-            Toast.makeText(this, String.format("X Share: %s", ex.getLocalizedMessage()), Toast.LENGTH_LONG).show();
-            Log.e(TAG, "Share creation error: " + ex);
+            });
+        } catch (PendingIntent.CanceledException e) {
+            Log.e(TAG, "Main Intent Cancelled", e);
         }
-
-        return "";
-    }
-
-    @NonNull
-    private String getSharableUrl(String key, StringBuilder sharedFilesPaths, String sharePw, String expiration, @NonNull Uri shareApiUri) {
-        try {
-            String jsonBody = String.format("{\"k\":\"%s\",\"vp\":[%s],\"pw\":\"%s\",\"exp\":\"%s\",\"perms\":[\"read\"]}", key, sharedFilesPaths, sharePw, expiration);
-
-            HttpURLConnection conn = (HttpURLConnection) (new URL(shareApiUri.getScheme() + "://" + shareApiUri.getAuthority() + "/")).openConnection();
-            conn.setDoOutput(true);
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Content-Type", "text/plain");
-            if (serverPas != null) conn.setRequestProperty("PW", serverPas);
-
-            byte[] body = jsonBody.getBytes(StandardCharsets.UTF_8);
-            conn.setFixedLengthStreamingMode(body.length);
-            conn.connect();
-
-            OutputStream os = conn.getOutputStream();
-            os.write(body);
-            os.flush();
-
-            int rc = conn.getResponseCode();
-            if (rc >= 300) {
-                Log.w(TAG, "Share creation failed: " + rc);
-                conn.disconnect();
-                throw new RuntimeException("Unable to get share url!");
-            }
-
-            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String response = br.readLine();
-            conn.disconnect();
-
-            if (response != null && response.startsWith("created share: "))
-                return response.substring(15);
-
-            return "";
-        } catch (Exception e) {
-            Log.e(TAG, "Unable to get sharable url from server", e);
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int permRequestCode, @NonNull String[] perms, @NonNull int[] grantRes) {
-        super.onRequestPermissionsResult(permRequestCode, perms, grantRes);
-        String perm = Manifest.permission.READ_EXTERNAL_STORAGE;
-        if (permRequestCode != 573) return;
-
-        for (int a = 0; a < grantRes.length; a++) {
-            if (!perms[a].equals(perm)) continue;
-
-            if (grantRes[a] != PackageManager.PERMISSION_GRANTED) return;
-        }
-    }
-
-    private String getExpiration() {
-        EditText expField = binding.shareExpiration;
-        String expValue = expField.getText().toString();
-        int[] parsed = parseExpiration(expValue);
-        String expiration = "";
-        if (parsed[1] >= 0) {
-            int minutes = parsed[0];
-            if (parsed[1] == 1) minutes *= 60;
-            else if (parsed[1] == 2) minutes *= 1440;
-            expiration = String.valueOf(minutes);
-        }
-
-        return expiration;
-    }
-
-    @NonNull
-    @Contract("null -> new")
-    private int[] parseExpiration(String value) {
-        if (value == null || value.trim().isEmpty()) return new int[]{0, -1};
-
-        value = value.trim().toLowerCase();
-        if (!value.matches("^\\d+[mhd]?$")) return new int[]{0, -1};
-
-        char unit = value.charAt(value.length() - 1);
-        int num;
-        int unitType;
-
-        if (Character.isDigit(unit)) {
-            num = Integer.parseInt(value);
-            unitType = 0; // minutes
-        } else {
-            num = Integer.parseInt(value.substring(0, value.length() - 1));
-            switch (unit) {
-                case 'h':
-                    unitType = 1;
-                    break;
-                case 'd':
-                    unitType = 2;
-                    break;
-                default:
-                    unitType = 0;
-                    break;
-            }
-        }
-        return new int[]{num, unitType};
-    }
-
-    @NonNull
-    private String generateRandomKey() {
-        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        SecureRandom random = new SecureRandom();
-        StringBuilder key = new StringBuilder();
-        for (int i = 0; i < 12; i++)
-            key.append(chars.charAt(random.nextInt(chars.length())));
-        return key.toString();
     }
 
     private enum MESSAGE_KIND {

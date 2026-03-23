@@ -51,4 +51,7 @@
     <string name="server_password_help"><![CDATA[If server has enabled login using usernames, input \"<username>:<password>\",\nFor example: azure:hunter2\n\nLong-press to reveal the password]]></string>
     <string name="invalid_expiration">Invalid format. Use: 30m, 2h, 7d, or empty for never</string>
     <string name="default_expiration">Never expires</string>
+    <string name="noti_action_copy">Copy</string>
+    <string name="noti_action_share">Share</string>
+    <string name="noti_action_qr">Show QR</string>
 </resources>
