@@ -4,7 +4,6 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.MenuItem;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
@@ -16,6 +15,7 @@ import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreference;
 
 import me.ocv.partyup.objects.PrefsKey;
+import me.ocv.partyup.utils.ToastUtils;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -136,7 +136,7 @@ public class SettingsActivity extends AppCompatActivity {
                     String value = (String) newValue;
                     String error = validateExpiration(value);
                     if (error != null) {
-                        Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                        ToastUtils.show(getContext(), error);
                         return false;
                     }
                     return true;

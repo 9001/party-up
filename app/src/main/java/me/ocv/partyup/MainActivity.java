@@ -1,18 +1,14 @@
 package me.ocv.partyup;
 
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
-import androidx.preference.PreferenceManager;
 
 import me.ocv.partyup.databinding.ActivityMainBinding;
-import me.ocv.partyup.objects.PrefsKey;
 
 public class MainActivity extends AppCompatActivity {
 

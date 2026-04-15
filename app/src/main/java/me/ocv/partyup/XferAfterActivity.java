@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -22,6 +21,8 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.io.Serializable;
+
+import me.ocv.partyup.utils.ToastUtils;
 
 public class XferAfterActivity extends AppCompatActivity {
     public static final String ACTION_KEY = "action";
@@ -77,7 +78,7 @@ public class XferAfterActivity extends AppCompatActivity {
         ClipData cd = ClipData.newPlainText(getString(R.string.clipboard_label), shareUrl);
         cb.setPrimaryClip(cd);
 
-        Toast.makeText(this, R.string.copy_success, Toast.LENGTH_SHORT).show();
+        ToastUtils.show(this, getString(R.string.copy_success));
 
         finishAndRemoveTask();
     }
@@ -132,7 +133,7 @@ public class XferAfterActivity extends AppCompatActivity {
             dialog.show();
 
         } catch (WriterException e) {
-            Toast.makeText(this, e.getLocalizedMessage(), Toast.LENGTH_LONG).show();
+            ToastUtils.show(this, e.getLocalizedMessage());
             Log.e(TAG, "Unable to show QR", e);
             finishAndRemoveTask();
         }
