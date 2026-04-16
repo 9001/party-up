@@ -5,4 +5,5 @@ public class BaseUploadProgress {
 
     public long total = 0;
     public long delta = 0;
+
 }

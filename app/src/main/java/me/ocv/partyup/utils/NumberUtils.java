@@ -7,9 +7,12 @@ import java.util.Locale;
 import me.ocv.partyup.objects.CustomFile;
 
 public final class NumberUtils {
-    public static final String[] UNITS = {"KiB", "MiB", "GiB", "TiB", "PiB"};
+    public static final String[] UNITS = { "KiB", "MiB", "GiB", "TiB", "PiB" };
 
-    public static double calcPercentage(long x, long y) {
+    public static double calcPercentage(
+            long x,
+            long y
+    ) {
         return y > 0 ? ((double) x / y) * 100.0f : 0.0f;
     }
 
@@ -17,7 +20,9 @@ public final class NumberUtils {
         long result = 0;
         if (files != null) {
             for (CustomFile file : files) {
-                if (file.size == null) continue;
+                if (file.size == null) {
+                    continue;
+                }
                 result += file.size;
             }
         }
@@ -40,4 +45,5 @@ public final class NumberUtils {
 
         return String.format(Locale.getDefault(), "%.2f %s", value, UNITS[unit]);
     }
+
 }

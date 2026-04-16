@@ -23,6 +23,7 @@
     <string name="share_link">Share\nLink</string>
     <string name="close_app">Close\nApp</string>
     <string name="open_settings">Open Settings</string>
+    <string name="stop_service">Kill service</string>
     <string name="textview_placeholder">TextView</string>
     <string name="banner_description">Information on how to upload</string>
     <string name="anime_girl">An anime girl</string>

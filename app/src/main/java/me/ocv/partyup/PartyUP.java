@@ -13,6 +13,9 @@ public class PartyUP extends Application {
     public void onCreate() {
         super.onCreate();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
-        AppCompatDelegate.setDefaultNightMode(preferences.getBoolean(PrefsKey.DARK_MODE, false) ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
+        AppCompatDelegate.setDefaultNightMode(preferences.getBoolean(PrefsKey.DARK_MODE, false)
+                                              ? AppCompatDelegate.MODE_NIGHT_YES
+                                              : AppCompatDelegate.MODE_NIGHT_NO);
     }
+
 }

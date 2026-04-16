@@ -1,22 +1,26 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    >
 
     <ImageView
         android:id="@+id/anime_girl"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:scaleType="fitEnd"
         android:adjustViewBounds="true"
         android:alpha="0.2"
         android:contentDescription="@string/anime_girl"
-        app:srcCompat="@drawable/ame" />
+        android:scaleType="fitEnd"
+        app:srcCompat="@drawable/ame"
+        />
 
     <FrameLayout
         android:id="@+id/settings"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        />
 
 </FrameLayout>

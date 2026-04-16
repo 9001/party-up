@@ -25,20 +25,15 @@ import java.io.Serializable;
 import me.ocv.partyup.utils.ToastUtils;
 
 public class XferAfterActivity extends AppCompatActivity {
-    public static final String ACTION_KEY = "action";
+    public static final String ACTION_KEY    = "action";
     public static final String SHARE_URL_KEY = "share_url";
-
-    public enum ActionType implements Serializable {
-        ACTION_COPY,
-        ACTION_SHARE,
-        ACTION_SHOW_QR
-    }
-
-    private static final String TAG = "TransferAfter";
-    private static final int QR_SIZE = 256;
+    private static final String TAG     = "TransferAfter";
+    private static final int    QR_SIZE = 256;
 
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(
+            @Nullable Bundle savedInstanceState
+    ) {
         super.onCreate(savedInstanceState);
 
         Intent intent = getIntent();
@@ -109,9 +104,7 @@ public class XferAfterActivity extends AppCompatActivity {
 
             for (int x = 0; x < QR_SIZE; x++) {
                 for (int y = 0; y < QR_SIZE; y++) {
-                    shareQr.setPixel(x, y,
-                            bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE
-                    );
+                    shareQr.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
                 }
             }
 
@@ -119,16 +112,15 @@ public class XferAfterActivity extends AppCompatActivity {
             shownImage.setImageBitmap(shareQr);
             shownImage.setLayoutParams(new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
+                                                                  ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
             shownImage.setAdjustViewBounds(true);
 
-            AlertDialog dialog = new AlertDialog.Builder(this)
-                    .setView(shownImage)
-                    .setCancelable(true)
-                    .setOnDismissListener(d -> finishAndRemoveTask())
-                    .create();
+            AlertDialog dialog = new AlertDialog.Builder(this).setView(shownImage)
+                                                              .setCancelable(true)
+                                                              .setOnDismissListener(d -> finishAndRemoveTask())
+                                                              .create();
 
             dialog.show();
 
@@ -138,4 +130,9 @@ public class XferAfterActivity extends AppCompatActivity {
             finishAndRemoveTask();
         }
     }
+
+    public enum ActionType implements Serializable {
+        ACTION_COPY, ACTION_SHARE, ACTION_SHOW_QR
+    }
+
 }
