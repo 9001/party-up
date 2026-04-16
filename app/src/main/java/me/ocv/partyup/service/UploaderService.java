@@ -52,6 +52,7 @@ import me.ocv.partyup.objects.CustomFile;
 import me.ocv.partyup.objects.PrefsKey;
 import me.ocv.partyup.utils.NetworkUtils;
 import me.ocv.partyup.utils.NumberUtils;
+import me.ocv.partyup.utils.SoundUtils;
 
 public class UploaderService extends Service {
     // Jeezus look at those fields XD
@@ -256,10 +257,7 @@ public class UploaderService extends Service {
             object.put("vp", array);
             object.put(
                     "exp",
-                    XferActivity.getExpiration(preferences.getString(
-                            PrefsKey.LINK_EXPIRATION,
-                            ""
-                    ))
+                    XferActivity.getExpiration(preferences.getString(PrefsKey.LINK_EXPIRATION, ""))
             );
 
             String req = object.toString();
@@ -447,6 +445,7 @@ public class UploaderService extends Service {
 
         // Clean after success
         successListeners.remove(jobId);
+        SoundUtils.playSuccess();
     }
 
     private void notifyError(
@@ -481,6 +480,7 @@ public class UploaderService extends Service {
                 errorListeners.put(jobId, listeners);
             }
         }
+        SoundUtils.playError();
     }
 
     private void notifyProgress(
@@ -515,6 +515,7 @@ public class UploaderService extends Service {
                 progressListeners.put(jobId, listeners);
             }
         }
+        SoundUtils.playBackGround();
     }
 
     private void updateGlobalNotification() {
@@ -607,11 +608,6 @@ public class UploaderService extends Service {
         }
     }
 
-    public void stop() {
-        stopForeground(true);
-        stopSelf();
-    }
-
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -689,6 +685,10 @@ public class UploaderService extends Service {
         return job.id;
     }
 
+    public void stop() {
+        stopForeground(true);
+        stopSelf();
+    }
     public static final class STATE implements Serializable {
         private static final long serialVersionUID = 1L;
 
@@ -838,7 +838,7 @@ public class UploaderService extends Service {
                         .setContentTitle("File Uploaded!")
                         .setContentText("File successfully uploaded at: " + new Date())
                         .setSubText("Noice work!")
-                        .setProgress(100, 100, false)
+                        .setProgress(0, 0, false)
                         .setStyle(new NotificationCompat.BigTextStyle().setBigContentTitle(
                                                                                "Server Response")
                                                                        .bigText(resp != null &&
@@ -870,8 +870,7 @@ public class UploaderService extends Service {
                     UploaderService.this,
                     action.ordinal(),
                     intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT |
-                    PendingIntent.FLAG_IMMUTABLE
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
         }
 

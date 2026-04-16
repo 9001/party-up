@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
 
 import me.ocv.partyup.objects.PrefsKey;
+import me.ocv.partyup.utils.SoundUtils;
 
 public class PartyUP extends Application {
     @Override
@@ -16,6 +17,8 @@ public class PartyUP extends Application {
         AppCompatDelegate.setDefaultNightMode(preferences.getBoolean(PrefsKey.DARK_MODE, false)
                                               ? AppCompatDelegate.MODE_NIGHT_YES
                                               : AppCompatDelegate.MODE_NIGHT_NO);
+        SoundUtils.init(this);
+        SoundUtils.toggleShut(preferences.getBoolean(PrefsKey.SHUT_UP, true));
     }
 
 }

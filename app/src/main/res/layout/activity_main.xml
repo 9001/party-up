@@ -27,6 +27,54 @@
         android:text="@string/stop_service"
         />
 
+    <LinearLayout
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        >
+
+        <Button
+            android:id="@+id/successBtn"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="20dp"
+            android:paddingHorizontal="20dp"
+            android:layout_marginRight="20dp"
+            android:text="Success"
+            />
+
+        <Button
+            android:id="@+id/errBtn"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="20dp"
+            android:paddingHorizontal="20dp"
+            android:layout_marginRight="20dp"
+            android:text="Error"
+            />
+
+        <Button
+            android:id="@+id/bgBtn"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="20dp"
+            android:paddingHorizontal="20dp"
+            android:layout_marginBottom="20dp"
+            android:layout_marginRight="20dp"
+            android:text="Background"
+            />
+
+    </LinearLayout>
+
+
     <TextView
         android:id="@+id/textView4"
         android:layout_width="match_parent"

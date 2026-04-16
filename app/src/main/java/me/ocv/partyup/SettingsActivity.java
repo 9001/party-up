@@ -15,6 +15,7 @@ import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreference;
 
 import me.ocv.partyup.objects.PrefsKey;
+import me.ocv.partyup.utils.SoundUtils;
 import me.ocv.partyup.utils.ToastUtils;
 
 public class SettingsActivity extends AppCompatActivity {
@@ -60,6 +61,14 @@ public class SettingsActivity extends AppCompatActivity {
                 String rootKey
         ) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
+
+            SwitchPreference beMute = findPreference(PrefsKey.SHUT_UP);
+            if (beMute != null) {
+                beMute.setOnPreferenceChangeListener((p, n) -> {
+                    SoundUtils.toggleShut((boolean) n);
+                    return true;
+                });
+            }
 
             SwitchPreference beSilent = findPreference(PrefsKey.BE_SILENT);
             SwitchPreference autoSend = findPreference(PrefsKey.AUTOSEND);
@@ -177,7 +186,7 @@ public class SettingsActivity extends AppCompatActivity {
             char unit = value.charAt(value.length() - 1);
             int num;
             if (Character.isDigit(unit)) {
-                num = Integer.parseInt(value);
+                num  = Integer.parseInt(value);
                 unit = 'm';
             } else {
                 num = Integer.parseInt(value.substring(0, value.length() - 1));

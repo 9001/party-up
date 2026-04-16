@@ -11,6 +11,7 @@ public final class PrefsKey {
     public static final String SERVER_PASSWORD = "server_password";
     public static final String ANNOY_ME        = "be_annoying";
     public static final String ON_UP_OK        = "on_up_ok";
+    public static final String SHUT_UP         = "be_mute";
     private PrefsKey() {
     }
 

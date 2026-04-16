@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import me.ocv.partyup.databinding.ActivityMainBinding;
 import me.ocv.partyup.service.UploaderService;
 import me.ocv.partyup.utils.PermissionUtils;
+import me.ocv.partyup.utils.SoundUtils;
 import me.ocv.partyup.utils.ToastUtils;
 
 public class MainActivity extends AppCompatActivity {
@@ -50,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
                     mService.stop();
                     serviceKilled = true;
                     binding.stopServBtn.setEnabled(false);
+                    SoundUtils.playServiceKilled();
                 }
             });
         });
@@ -84,8 +86,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
 
+        setContentView(binding.getRoot());
         String txt = String.format(getString(R.string.welcome_text), BuildConfig.VERSION_NAME);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -99,6 +101,10 @@ public class MainActivity extends AppCompatActivity {
                 this,
                                                                              SettingsActivity.class
         )));
+
+        binding.errBtn.setOnClickListener(v -> SoundUtils.playError());
+        binding.successBtn.setOnClickListener(v -> SoundUtils.playSuccess());
+        binding.bgBtn.setOnClickListener(v -> SoundUtils.playBackGround());
     }
 
 }
