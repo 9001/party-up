@@ -1,0 +1,37 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    run-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distributon: 'temurin'
+          cache: 'gradle'
+
+      - name: Create env file
+        run: |
+          echo "${{ secrets.ENV_ENCODED }}" | base64 --decode > .env
+
+      - name: Build release APK
+        run: ./gradlew app:assembleRelease
+
+      - name: Create github release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/output/apk/release/app-release.apk
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
