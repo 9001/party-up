@@ -21,12 +21,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
-    - name: set up JDK 11
+    - name: set up JDK 17
       uses: actions/setup-java@v5
       with:
-        java-version: '11'
+        java-version: '17'
         distribution: 'temurin'
         cache: gradle
+        check-latest: true
 
     - name: Decode jdk file
       run: |
