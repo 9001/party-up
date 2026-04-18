@@ -25,6 +25,10 @@ jobs:
       run: |
         echo "${{ secrets.JKS_ENCODED }}" | base64 --decode > app/release.jks
 
+    - name: Create env file
+      run: |
+        echo "${{secrets.ENV_ENCODED}}" | base64 --decode > .env
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     
