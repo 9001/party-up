@@ -17,10 +17,10 @@ android {
 
     signingConfigs {
         release {
-            storeFile       file(System.getenv("RELEASE_STR_FILE"))
-            storePassword   System.getenv("RELEASE_STR_PASS")
-            keyAlias        System.getenv("RELEASE_KEY_ALIS")
-            keyPassword     System.getenv("RELEASE_KEY_PASS")
+            storeFile       file(env.fetch("RELEASE_STR_FILE"))
+            storePassword   env.fetch("RELEASE_STR_PASS")
+            keyAlias        env.fetch("RELEASE_KEY_ALIS")
+            keyPassword     env.fetch("RELEASE_KEY_PASS")
         }
     }
 

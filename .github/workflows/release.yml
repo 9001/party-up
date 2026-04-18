@@ -27,6 +27,9 @@ jobs:
         run: |
           echo "${{ secrets.ENV_ENCODED }}" | base64 --decode > .env
 
+      - name: Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+
       - name: Build release APK
         run: ./gradlew app:assembleRelease
 
