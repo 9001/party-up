@@ -41,4 +41,18 @@ jobs:
       run: chmod +x gradlew
     
     - name: Build with Gradle
-      run: ./gradlew build
+      run: ./gradlew app:assembleRelease
+
+    - name: Create release
+      uses: softprops/action-gh-release@v2
+      with:
+        # Uses the tag from the push event OR the manual input from workflow_dispatch
+        tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+        name: Release ${{ github.event.inputs.tag_name || github.ref_name }}
+        files: |
+          app/build/outputs/apk/release/*.apk
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
