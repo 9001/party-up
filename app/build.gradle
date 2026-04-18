@@ -10,8 +10,8 @@ android {
         applicationId "me.ocv.partyup"
         minSdk 21
         targetSdk 35
-        versionCode 10901
-        versionName "1.9.1"
+        versionCode 10200
+        versionName "1.2.0"
         multiDexEnabled true
     }
 
