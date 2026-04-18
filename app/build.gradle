@@ -15,9 +15,19 @@ android {
         multiDexEnabled true
     }
 
+    signingConfigs {
+        release {
+            storeFile       file(System.getenv("RELEASE_STR_FILE"))
+            storePassword   System.getenv("RELEASE_STR_PASS")
+            keyAlias        System.getenv("RELEASE_KEY_ALIS")
+            keyPassword     System.getenv("RELEASE_KEY_PASS")
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
+            signingConfig signingConfigs.release
         }
     }
 

@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    run-on: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -18,6 +18,10 @@ jobs:
           java-version: '17'
           distributon: 'temurin'
           cache: 'gradle'
+
+      - name: Decode jks file
+        run: |
+          echo "${{ secrets.JKS_ENCODED }}" | base64 --decode > app/release.jks
 
       - name: Create env file
         run: |
