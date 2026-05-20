@@ -63,6 +63,7 @@ public class UploaderService extends Service {
     private static final String CHANNEL_NAME = "PartyUploader";
     private static final String GROUP_NAME   = "party_upload_group";
 
+    private static final int MAX_JOBS                    = 5;
     private static final int INITIAL_COUNT               = 100;
     private static final int GLOBAL_NOTIFICATION_ID      = 69;
     private static final int SHARE_API_RESPONSE_NOT_OKAY = 300;
@@ -336,8 +337,7 @@ public class UploaderService extends Service {
     private void watchJobs() {
         watcher = executor.submit(() -> {
             try {
-                while (!Thread.currentThread()
-                              .isInterrupted()) {
+                while (!Thread.currentThread().isInterrupted() && jobs.size() < MAX_JOBS) {
                     uploadFile(jobs.take());
                 }
             } catch (InterruptedException ignored) {
@@ -679,6 +679,12 @@ public class UploaderService extends Service {
         jobMap.put(file, job);
 
         if (!jobs.offer(job)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                jobMap.remove(file, job);
+            } else {
+                jobMap.remove(file);
+            }
+
             throw new RuntimeException("Unable to upload file");
         }
 
