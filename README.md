@@ -8,6 +8,10 @@ primarily made for this year's meadup, letting a room full of nerds throw memes 
 
 only the PUT API is implemented for now so there is no resumable uploads yet
 
+## Build
+cp: `./.env.example` -> `./.env`
+  - poplute it with values 
+  - run `./gradlew app:build`
 
 ## Basic usage
 
