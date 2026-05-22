@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    >
+    android:orientation="vertical">
 
     <Button
         android:id="@+id/settingsBtn"
@@ -14,8 +12,7 @@
         android:layout_marginLeft="20dp"
         android:layout_marginTop="20dp"
         android:layout_marginRight="20dp"
-        android:text="@string/open_settings"
-        />
+        android:text="@string/open_settings" />
 
     <Button
         android:id="@+id/stopServBtn"
@@ -24,16 +21,14 @@
         android:layout_marginLeft="20dp"
         android:layout_marginRight="20dp"
         android:enabled="false"
-        android:text="@string/stop_service"
-        />
+        android:text="@string/stop_service" />
 
     <LinearLayout
         style="?android:attr/buttonBarStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:orientation="vertical"
-        >
+        android:orientation="vertical">
 
         <Button
             android:id="@+id/successBtn"
@@ -44,8 +39,7 @@
             android:layout_marginTop="20dp"
             android:paddingHorizontal="20dp"
             android:layout_marginRight="20dp"
-            android:text="Success"
-            />
+            android:text="Success" />
 
         <Button
             android:id="@+id/errBtn"
@@ -56,8 +50,7 @@
             android:layout_marginTop="20dp"
             android:paddingHorizontal="20dp"
             android:layout_marginRight="20dp"
-            android:text="Error"
-            />
+            android:text="Error" />
 
         <Button
             android:id="@+id/bgBtn"
@@ -69,8 +62,7 @@
             android:paddingHorizontal="20dp"
             android:layout_marginBottom="20dp"
             android:layout_marginRight="20dp"
-            android:text="Background"
-            />
+            android:text="Background" />
 
     </LinearLayout>
 
@@ -80,8 +72,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="20dp"
-        android:text="@string/textview_placeholder"
-        />
+        android:text="@string/textview_placeholder" />
 
     <ImageView
         android:id="@+id/imageView"
@@ -90,7 +81,6 @@
         android:layout_marginLeft="20dp"
         android:layout_marginRight="20dp"
         android:contentDescription="@string/banner_description"
-        app:srcCompat="@drawable/banner"
-        />
+        app:srcCompat="@drawable/banner" />
 
 </LinearLayout>

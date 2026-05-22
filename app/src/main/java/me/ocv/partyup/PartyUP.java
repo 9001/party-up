@@ -15,8 +15,8 @@ public class PartyUP extends Application {
         super.onCreate();
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
         AppCompatDelegate.setDefaultNightMode(preferences.getBoolean(PrefsKey.DARK_MODE, false)
-                                              ? AppCompatDelegate.MODE_NIGHT_YES
-                                              : AppCompatDelegate.MODE_NIGHT_NO);
+                ? AppCompatDelegate.MODE_NIGHT_YES
+                : AppCompatDelegate.MODE_NIGHT_NO);
         SoundUtils.init(this);
         SoundUtils.toggleShut(preferences.getBoolean(PrefsKey.SHUT_UP, true));
     }

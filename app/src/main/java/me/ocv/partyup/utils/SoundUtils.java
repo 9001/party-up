@@ -17,11 +17,11 @@ public final class SoundUtils {
 
     private static final Random random = new Random();
 
-    private static final float RATE_HIGH   = 0.9f;
+    private static final float RATE_HIGH = 0.9f;
     private static final float RATE_FACTOR = 0.2f;
 
-    private static final long BG_COOLDOWN      = 150;
-    private static final long MAIN_COOLDOWN    = 300;
+    private static final long BG_COOLDOWN = 150;
+    private static final long MAIN_COOLDOWN = 300;
     private static final long BG_ACTIVE_WINDOW = 8000/*ms*/;
 
     private static final Handler handler = new Handler(Looper.getMainLooper());
@@ -35,14 +35,14 @@ public final class SoundUtils {
 
     private static boolean initialized = false;
 
-    private static int       currentStreamId = 0;
-    private static SoundType currentType     = null;
-    private static long      lastPlayTime    = 0;
+    private static int currentStreamId = 0;
+    private static SoundType currentType = null;
+    private static long lastPlayTime = 0;
 
-    private static int      bgStreamId    = 0;
-    private static long     bgActiveUntil = 0;
+    private static int bgStreamId = 0;
+    private static long bgActiveUntil = 0;
     private static Runnable bgStopRunnable;
-    private static boolean  be_silent     = false;
+    private static boolean be_silent = false;
 
     private SoundUtils() {
     }
@@ -63,8 +63,8 @@ public final class SoundUtils {
         }
 
         currentStreamId = 0;
-        bgStreamId      = 0;
-        currentType     = null;
+        bgStreamId = 0;
+        currentType = null;
 
         initialized = false;
     }
@@ -127,7 +127,7 @@ public final class SoundUtils {
 
         currentStreamId = soundPool.play(soundId, 1f, 1f, type.priority, 0, rate);
 
-        currentType  = type;
+        currentType = type;
         lastPlayTime = now;
     }
 
@@ -175,8 +175,8 @@ public final class SoundUtils {
         bgStreamId = soundPool.play(soundId, 1f, 1f, 0, -1, rate);
 
         currentStreamId = bgStreamId;
-        currentType     = SoundType.BG;
-        lastPlayTime    = now;
+        currentType = SoundType.BG;
+        lastPlayTime = now;
 
         scheduleBgStop();
     }
@@ -209,18 +209,19 @@ public final class SoundUtils {
             return;
         }
 
-        AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                                                                       .setContentType(
-                                                                               AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                                                       .build();
+        AudioAttributes audioAttributes = new AudioAttributes.Builder().setUsage(
+                        AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(
+                        AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
 
         soundPool = new SoundPool.Builder().setMaxStreams(2)
-                                           .setAudioAttributes(audioAttributes)
-                                           .build();
+                .setAudioAttributes(audioAttributes)
+                .build();
 
-        errorSounds         = load(context, ERROR_SOUND_IDS);
-        successSounds       = load(context, SUCCESS_SOUND_IDS);
-        bgSounds            = load(context, BG_SOUND_IDS);
+        errorSounds = load(context, ERROR_SOUND_IDS);
+        successSounds = load(context, SUCCESS_SOUND_IDS);
+        bgSounds = load(context, BG_SOUND_IDS);
         serviceKilledSounds = load(context, SERVICE_KILLED_SOUND_IDS);
 
         initialized = true;

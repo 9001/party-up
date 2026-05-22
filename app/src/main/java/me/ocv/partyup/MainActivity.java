@@ -19,9 +19,9 @@ import me.ocv.partyup.utils.SoundUtils;
 import me.ocv.partyup.utils.ToastUtils;
 
 public class MainActivity extends AppCompatActivity {
-    private       UploaderService mService;
-    private       ActivityMainBinding binding;
-    private       boolean serviceKilled;
+    private UploaderService mService;
+    private ActivityMainBinding binding;
+    private boolean serviceKilled;
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(
@@ -99,7 +99,7 @@ public class MainActivity extends AppCompatActivity {
 
         binding.settingsBtn.setOnClickListener(v -> startActivity(new Intent(
                 this,
-                                                                             SettingsActivity.class
+                SettingsActivity.class
         )));
 
         binding.errBtn.setOnClickListener(v -> SoundUtils.playError());

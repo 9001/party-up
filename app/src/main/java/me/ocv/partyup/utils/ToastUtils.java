@@ -26,11 +26,11 @@ public final class ToastUtils {
         }
 
         new Handler(Looper.getMainLooper()).post(() -> Toast.makeText(
-                                                                    context.getApplicationContext(),
-                                                                    msg,
-                                                                    Toast.LENGTH_SHORT
-                                                            )
-                                                            .show());
+                        context.getApplicationContext(),
+                        msg,
+                        Toast.LENGTH_SHORT
+                )
+                .show());
     }
 
 }

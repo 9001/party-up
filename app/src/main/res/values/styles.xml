@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="TextAppearance.PartyUP.Error"
-           parent="@style/TextAppearance.MaterialComponents.Body1">
+    <style name="TextAppearance.PartyUP.Error" parent="@style/TextAppearance.MaterialComponents.Body1">
         <item name="android:textColor">?attr/colorError</item>
     </style>
 
-    <style name="TextAppearance.PartyUP.Success"
-           parent="@style/TextAppearance.Material3.LabelLarge.Emphasized">
+    <style name="TextAppearance.PartyUP.Success" parent="@style/TextAppearance.Material3.LabelLarge.Emphasized">
         <item name="android:textColor">?attr/colorAccent</item>
     </style>
 
-    <style name="TextAppearance.PartyUP.Normal"
-           parent="@style/TextAppearance.Material3.LabelMedium">
+    <style name="TextAppearance.PartyUP.Normal" parent="@style/TextAppearance.Material3.LabelMedium">
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 </resources>

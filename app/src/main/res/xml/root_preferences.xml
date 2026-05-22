@@ -1,7 +1,5 @@
-<PreferenceScreen
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    >
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory app:title="Connection">
 
@@ -13,15 +11,13 @@
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="Server URL"
-            app:useSimpleSummaryProvider="true"
-            />
+            app:useSimpleSummaryProvider="true" />
         <EditTextPreference
             android:key="server_password"
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="Password"
-            app:useSimpleSummaryProvider="true"
-            />
+            app:useSimpleSummaryProvider="true" />
 
     </PreferenceCategory>
     <PreferenceCategory android:title="Behavior">
@@ -30,35 +26,30 @@
             android:defaultValue="false"
             android:key="be_mute"
             android:summary="Play background sfx while uploading"
-            android:title="Shut up!"
-            />
+            android:title="Shut up!" />
         <SwitchPreference
             android:defaultValue="false"
             android:key="be_silent"
             android:summary="Upload in background"
-            android:title="Don't Bother"
-            />
+            android:title="Don't Bother" />
         <SwitchPreference
             android:defaultValue="false"
             android:key="auto_send"
             android:title="Just go"
-            app:summary="Skip confirmation screen"
-            />
+            app:summary="Skip confirmation screen" />
         <SwitchPreference
             android:defaultValue="false"
             android:dependency="be_silent"
             android:key="be_annoying"
             android:summary="Gonna annoy you ;)"
-            android:title="Annoy me"
-            />
+            android:title="Annoy me" />
         <ListPreference
             android:defaultValue="close"
             android:entries="@array/on_success_action_value"
             android:entryValues="@array/on_success_action_key"
             android:key="on_up_ok"
             android:title="On upload success..."
-            app:useSimpleSummaryProvider="true"
-            />
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="Share links">
@@ -66,29 +57,25 @@
             android:defaultValue="false"
             android:key="use_share_url"
             android:title="Use share link"
-            app:summary="Create a (temporary) share link"
-            />
+            app:summary="Create a (temporary) share link" />
         <EditTextPreference
             android:defaultValue=""
             android:dependency="use_share_url"
             android:key="link_expiration"
-            android:title="Default expiration (e.g., 10m, 2h, 1d)"
-            />
+            android:title="Default expiration (e.g., 10m, 2h, 1d)" />
         <EditTextPreference
             android:defaultValue=""
             android:dependency="use_share_url"
             android:key="share_password"
             android:title="Default password"
-            app:useSimpleSummaryProvider="true"
-            />
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory android:title="UI">
         <SwitchPreference
             android:defaultValue="false"
             android:key="dark_mode"
             android:summary="Use Dark mode for UI"
-            android:title="Dark mode"
-            />
+            android:title="Dark mode" />
     </PreferenceCategory>
 
 </PreferenceScreen>

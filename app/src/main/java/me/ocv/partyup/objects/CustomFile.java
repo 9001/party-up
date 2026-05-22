@@ -28,8 +28,8 @@ public class CustomFile implements Parcelable {
             return new CustomFile[size];
         }
     };
-    public Uri    handle;
-    public Long   size;
+    public Uri handle;
+    public Long size;
     public String name;
     public String full_url;
     public String share_url;
@@ -50,13 +50,13 @@ public class CustomFile implements Parcelable {
         } else {
             size = in.readLong();
         }
-        name      = in.readString();
-        full_url  = in.readString();
+        name = in.readString();
+        full_url = in.readString();
         share_url = in.readString();
-        desc      = in.readString();
-        content   = in.readString();
-        mime      = in.readString();
-        ext       = in.readString();
+        desc = in.readString();
+        content = in.readString();
+        mime = in.readString();
+        ext = in.readString();
     }
 
     public String getBestUrl() {
@@ -74,7 +74,7 @@ public class CustomFile implements Parcelable {
 
     public boolean isSharable() {
         boolean hasUrl = (share_url != null && !share_url.isEmpty()) ||
-                         (full_url != null && !full_url.isEmpty());
+                (full_url != null && !full_url.isEmpty());
         boolean isText = "text/plain".equals(mime);
 
         return hasUrl && !isText;
@@ -84,8 +84,8 @@ public class CustomFile implements Parcelable {
     @Override
     public String toString() {
         return "CustomFile{" + "handle=" + handle + ", size=" + size + ", name=" + name +
-               ", full_url=" + full_url + ", share_url=" + share_url + ", content=" + content +
-               ", mime=" + mime + ", ext=" + ext + '}';
+                ", full_url=" + full_url + ", share_url=" + share_url + ", content=" + content +
+                ", mime=" + mime + ", ext=" + ext + '}';
     }
 
     @Override

@@ -1,35 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    >
+    android:orientation="vertical">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior"
-        >
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp"
-            >
+            android:padding="16dp">
 
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1"
-                >
+                android:layout_weight="1">
 
                 <LinearLayout
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    >
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
 
                     <TextView
                         android:id="@+id/upper_info"
@@ -38,8 +33,7 @@
                         android:lineSpacingExtra="4dp"
                         android:text="@string/upload_default_string"
                         android:textAlignment="center"
-                        android:textAppearance="@style/TextAppearance.PartyUP.Normal"
-                        />
+                        android:textAppearance="@style/TextAppearance.PartyUP.Normal" />
                 </LinearLayout>
 
             </ScrollView>
@@ -50,16 +44,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:orientation="vertical"
-                android:visibility="gone"
-                >
+                android:visibility="gone">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/share_config_text"
                     android:textAlignment="center"
-                    android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall"
-                    />
+                    android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall" />
 
 
                 <!-- expires -->
@@ -67,16 +59,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:gravity="center_vertical"
-                    >
+                    android:gravity="center_vertical">
 
                     <TextView
                         android:layout_width="90dp"
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:text="@string/expires"
-                        />
+                        android:text="@string/expires" />
 
                     <EditText
                         android:id="@+id/share_expiration"
@@ -85,8 +75,7 @@
                         android:layout_weight="1"
                         android:autofillHints=""
                         android:hint="@string/share_expiration_hint"
-                        android:inputType="text"
-                        />
+                        android:inputType="text" />
                 </LinearLayout>
 
 
@@ -95,16 +84,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
-                    >
+                    android:gravity="center_vertical">
 
                     <TextView
                         android:layout_width="90dp"
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:text="@string/password"
-                        />
+                        android:text="@string/password" />
 
                     <EditText
                         android:id="@+id/share_password"
@@ -113,8 +100,7 @@
                         android:layout_weight="1"
                         android:autofillHints=""
                         android:hint="@string/share_password_hint"
-                        android:inputType="textVisiblePassword"
-                        />
+                        android:inputType="textVisiblePassword" />
                 </LinearLayout>
 
             </LinearLayout>
@@ -124,16 +110,14 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|center"
                 android:layout_marginTop="16dp"
-                android:orientation="vertical"
-                >
+                android:orientation="vertical">
 
                 <!-- Buttons -->
                 <GridLayout
                     android:id="@+id/success_buttons"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:columnCount="2"
-                    >
+                    android:columnCount="2">
 
                     <Button
                         android:id="@+id/btnCopyLink"
@@ -142,8 +126,7 @@
                         android:layout_columnWeight="1"
                         android:layout_marginEnd="8dp"
                         android:maxLines="2"
-                        android:text="@string/copy_link"
-                        />
+                        android:text="@string/copy_link" />
 
                     <Button
                         android:id="@+id/btnQrCode"
@@ -152,8 +135,7 @@
                         android:layout_columnWeight="1"
                         android:layout_marginStart="8dp"
                         android:maxLines="2"
-                        android:text="@string/show_qr_code"
-                        />
+                        android:text="@string/show_qr_code" />
 
                     <Button
                         android:id="@+id/btnShareLink"
@@ -162,8 +144,7 @@
                         android:layout_columnWeight="1"
                         android:layout_marginEnd="8dp"
                         android:maxLines="2"
-                        android:text="@string/share_link"
-                        />
+                        android:text="@string/share_link" />
 
                     <Button
                         android:id="@+id/btnExit"
@@ -172,8 +153,7 @@
                         android:layout_columnWeight="1"
                         android:layout_marginStart="8dp"
                         android:maxLines="2"
-                        android:text="@string/close_app"
-                        />
+                        android:text="@string/close_app" />
 
                 </GridLayout>
 
@@ -184,8 +164,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:max="100"
-                    android:scaleY="5"
-                    />
+                    android:scaleY="5" />
 
             </LinearLayout>
 
@@ -207,8 +186,7 @@
         app:maxImageSize="28dp"
         app:rippleColor="?attr/colorControlHighlight"
         app:srcCompat="@android:drawable/ic_menu_send"
-        app:tint="?attr/colorOnSurface"
-        />
+        app:tint="?attr/colorOnSurface" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/action_config"
@@ -224,7 +202,6 @@
         app:maxImageSize="24dp"
         app:rippleColor="?attr/colorControlHighlight"
         app:srcCompat="@android:drawable/ic_menu_edit"
-        app:tint="?attr/colorOnSurface"
-        />
+        app:tint="?attr/colorOnSurface" />
 
 </FrameLayout>

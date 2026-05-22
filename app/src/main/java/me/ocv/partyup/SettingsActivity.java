@@ -26,8 +26,8 @@ public class SettingsActivity extends AppCompatActivity {
         setContentView(R.layout.settings_activity);
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
-                                       .replace(R.id.settings, new SettingsFragment())
-                                       .commit();
+                    .replace(R.id.settings, new SettingsFragment())
+                    .commit();
         }
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -35,7 +35,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         if (prefs.getString(PrefsKey.ON_UP_OK, "menu")
-                 .equals("menu")) {
+                .equals("menu")) {
             SharedPreferences.Editor ed = prefs.edit();
             ed.putString(PrefsKey.ON_UP_OK, "menu");
             ed.apply();
@@ -48,7 +48,7 @@ public class SettingsActivity extends AppCompatActivity {
     ) {
         if (item.getItemId() == android.R.id.home) {
             super.getOnBackPressedDispatcher()
-                 .onBackPressed();
+                    .onBackPressed();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -116,7 +116,7 @@ public class SettingsActivity extends AppCompatActivity {
             if (passwd != null) {
                 passwd.setSummaryProvider(preference -> {
                     if (passwd.getText() == null || passwd.getText()
-                                                          .isEmpty()) {
+                            .isEmpty()) {
                         return getString(R.string.setting_password_empty);
                     } else {
                         return getString(R.string.setting_password_success);
@@ -158,12 +158,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         private String validateExpiration(String value) {
             if (value == null || value.trim()
-                                      .isEmpty()) {
+                    .isEmpty()) {
                 return null; // Empty is valid (never expires)
             }
 
             value = value.trim()
-                         .toLowerCase();
+                    .toLowerCase();
             if (value.matches("^\\d+[mhd]?$")) {
                 return null; // Valid format
             }
@@ -173,12 +173,12 @@ public class SettingsActivity extends AppCompatActivity {
 
         private String getExpSummaryText(String value) {
             if (value == null || value.trim()
-                                      .isEmpty()) {
+                    .isEmpty()) {
                 return getString(R.string.default_expiration);
             }
 
             value = value.trim()
-                         .toLowerCase();
+                    .toLowerCase();
             if (!value.matches("^\\d+[mhd]?$")) {
                 return getString(R.string.invalid_expiration);
             }
@@ -186,7 +186,7 @@ public class SettingsActivity extends AppCompatActivity {
             char unit = value.charAt(value.length() - 1);
             int num;
             if (Character.isDigit(unit)) {
-                num  = Integer.parseInt(value);
+                num = Integer.parseInt(value);
                 unit = 'm';
             } else {
                 num = Integer.parseInt(value.substring(0, value.length() - 1));

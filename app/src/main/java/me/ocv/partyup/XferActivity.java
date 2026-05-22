@@ -56,22 +56,22 @@ public class XferActivity extends AppCompatActivity {
             Locale.getDefault()
     );
 
-    private final Analyzer                 analyzer       = new Analyzer();
-    private final StringBuilder            serverResponse = new StringBuilder();
-    private final Map<CustomFile, Section> fileSections   = new LinkedHashMap<>();
-    private final AtomicInteger            uploadCount    = new AtomicInteger(0);
-    private       ActivityXferBinding      binding;
-    private       SharedPreferences        prefs;
-    private       UploaderService          mService;
-    private       String                   serverUrl;
-    private       String                   shareUrl;
-    private       CustomFile[]             filesToUpload;
-    private       boolean                  isUploaded;
-    private       boolean                  autoSend;
-    private       boolean                  beSilent;
-    private       long                     startedAt      = System.currentTimeMillis();
-    private       Date                     startedOn      = null;
-    private final ServiceConnection        connection     = new ServiceConnection() {
+    private final Analyzer analyzer = new Analyzer();
+    private final StringBuilder serverResponse = new StringBuilder();
+    private final Map<CustomFile, Section> fileSections = new LinkedHashMap<>();
+    private final AtomicInteger uploadCount = new AtomicInteger(0);
+    private ActivityXferBinding binding;
+    private SharedPreferences prefs;
+    private UploaderService mService;
+    private String serverUrl;
+    private String shareUrl;
+    private CustomFile[] filesToUpload;
+    private boolean isUploaded;
+    private boolean autoSend;
+    private boolean beSilent;
+    private long startedAt = System.currentTimeMillis();
+    private Date startedOn = null;
+    private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(
                 ComponentName componentName,
@@ -107,14 +107,14 @@ public class XferActivity extends AppCompatActivity {
     @Contract("null -> new")
     private static int[] parseExpiration(String value) {
         if (value == null || value.trim()
-                                  .isEmpty()) {
-            return new int[] { 0, -1 };
+                .isEmpty()) {
+            return new int[]{ 0, -1 };
         }
 
         value = value.trim()
-                     .toLowerCase();
+                .toLowerCase();
         if (!value.matches("^\\d+[mhd]?$")) {
-            return new int[] { 0, -1 };
+            return new int[]{ 0, -1 };
         }
 
         char unit = value.charAt(value.length() - 1);
@@ -122,7 +122,7 @@ public class XferActivity extends AppCompatActivity {
         int unitType;
 
         if (Character.isDigit(unit)) {
-            num      = Integer.parseInt(value);
+            num = Integer.parseInt(value);
             unitType = 0; // minutes
         } else {
             num = Integer.parseInt(value.substring(0, value.length() - 1));
@@ -138,7 +138,7 @@ public class XferActivity extends AppCompatActivity {
                     break;
             }
         }
-        return new int[] { num, unitType };
+        return new int[]{ num, unitType };
     }
 
     public static String generateRandomKey() {
@@ -227,7 +227,7 @@ public class XferActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityXferBinding.inflate(getLayoutInflater());
-        prefs   = PreferenceManager.getDefaultSharedPreferences(this);
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         doInit();
         loadPrefs();
@@ -249,9 +249,9 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void loadPrefs() {
-        autoSend  = prefs.getBoolean(PrefsKey.AUTOSEND, false);
+        autoSend = prefs.getBoolean(PrefsKey.AUTOSEND, false);
         serverUrl = prefs.getString(PrefsKey.SERVER_URL, "");
-        beSilent  = prefs.getBoolean(PrefsKey.BE_SILENT, false);
+        beSilent = prefs.getBoolean(PrefsKey.BE_SILENT, false);
 
         if (serverUrl.isEmpty()) {
             startActivity(new Intent(this, SettingsActivity.class));
@@ -260,7 +260,7 @@ public class XferActivity extends AppCompatActivity {
     }
 
     private void doInit() {
-        isUploaded    = false;
+        isUploaded = false;
         filesToUpload = analyzer.analyze(this, getIntent(), (e) -> Log.e(TAG, e));
 
         // Grant URI permissions for all files
@@ -295,8 +295,8 @@ public class XferActivity extends AppCompatActivity {
             );
         }
 
-        startedAt  = System.currentTimeMillis();
-        startedOn  = new Date(startedAt);
+        startedAt = System.currentTimeMillis();
+        startedOn = new Date(startedAt);
         isUploaded = false;
     }
 
@@ -312,40 +312,40 @@ public class XferActivity extends AppCompatActivity {
                 int jobId = mService.enqueueFile(file);
 
                 if (annoying) {
-                    lastSeen.put(jobId, new Long[] { 0L });
+                    lastSeen.put(jobId, new Long[]{ 0L });
                     mService.addProgressListener(
                             jobId,
                             null /* temp */,
                             progress -> mService.getHandler()
-                                                .post(() -> {
-                                                    long now = System.currentTimeMillis();
+                                    .post(() -> {
+                                        long now = System.currentTimeMillis();
 
-                                                    if (now - Objects.requireNonNull(lastSeen.get(
-                                                            jobId))[0] > 1000) {
-                                                        lastSeen.put(jobId, new Long[] { now });
-                                                        ToastUtils.show(
-                                                                mService, String.format(
-                                                                        "Progress: %s/%s",
-                                                                        NumberUtils.formatBytes(
-                                                                                progress.done),
-                                                                        NumberUtils.formatBytes(
-                                                                                progress.total)
-                                                                )
-                                                        );
-                                                    }
-                                                })
+                                        if (now - Objects.requireNonNull(lastSeen.get(
+                                                jobId))[0] > 1000) {
+                                            lastSeen.put(jobId, new Long[]{ now });
+                                            ToastUtils.show(
+                                                    mService, String.format(
+                                                            "Progress: %s/%s",
+                                                            NumberUtils.formatBytes(
+                                                                    progress.done),
+                                                            NumberUtils.formatBytes(
+                                                                    progress.total)
+                                                    )
+                                            );
+                                        }
+                                    })
                     );
                     mService.addErrorListener(
                             jobId,
                             null /* temp */,
                             e -> mService.getHandler()
-                                         .post(() -> ToastUtils.show(
-                                                 mService,
-                                                 String.format(
-                                                         "Job %s failed!",
-                                                         jobId
-                                                 )
-                                         ))
+                                    .post(() -> ToastUtils.show(
+                                            mService,
+                                            String.format(
+                                                    "Job %s failed!",
+                                                    jobId
+                                            )
+                                    ))
                     );
                 }
             }
@@ -365,7 +365,7 @@ public class XferActivity extends AppCompatActivity {
         }
 
         binding.getRoot()
-               .post(this::showShareSettings);
+                .post(this::showShareSettings);
     }
 
     private void doUI() {
@@ -417,10 +417,10 @@ public class XferActivity extends AppCompatActivity {
         }
 
         binding.getRoot()
-               .post(() -> {
-                   binding.upperInfo.setTextAppearance(XferActivity.this, resId);
-                   binding.upperInfo.setText(message);
-               });
+                .post(() -> {
+                    binding.upperInfo.setTextAppearance(XferActivity.this, resId);
+                    binding.upperInfo.setText(message);
+                });
     }
 
     private void showSuccess(String message) {
@@ -460,14 +460,14 @@ public class XferActivity extends AppCompatActivity {
         updateSectionError(file, error);
 
         binding.getRoot()
-               .post(() -> {
-                   binding.actionSend.setEnabled(true);
-                   binding.actionConfig.setEnabled(true);
-                   binding.actionSend.setVisibility(View.VISIBLE);
-                   binding.actionConfig.setVisibility(View.VISIBLE);
+                .post(() -> {
+                    binding.actionSend.setEnabled(true);
+                    binding.actionConfig.setEnabled(true);
+                    binding.actionSend.setVisibility(View.VISIBLE);
+                    binding.actionConfig.setVisibility(View.VISIBLE);
 
-                   binding.successButtons.setVisibility(View.GONE);
-               });
+                    binding.successButtons.setVisibility(View.GONE);
+                });
 
         isUploaded = false;
         Log.e(TAG, "Upload failed due to service error", error);
@@ -481,13 +481,13 @@ public class XferActivity extends AppCompatActivity {
         this.serverResponse.append(serverResponse);
         updateSectionComplete(file, serverResponse);
         binding.getRoot()
-               .post(() -> {
-                   binding.actionConfig.setVisibility(View.VISIBLE);
-                   binding.actionSend.setVisibility(View.GONE);
+                .post(() -> {
+                    binding.actionConfig.setVisibility(View.VISIBLE);
+                    binding.actionSend.setVisibility(View.GONE);
 
-                   binding.actionConfig.setEnabled(true);
-                   binding.successButtons.setVisibility(View.VISIBLE);
-               });
+                    binding.actionConfig.setEnabled(true);
+                    binding.successButtons.setVisibility(View.VISIBLE);
+                });
 
         refreshSections(MESSAGE_KIND.SUCCESS);
         showSuccessScreen();
@@ -730,14 +730,15 @@ public class XferActivity extends AppCompatActivity {
     private enum MESSAGE_KIND {
         SUCCESS, ERROR, NORMAL
     }
+
     private final class Section {
         public CustomFile file;
-        public String     details;
+        public String details;
 
         public Section(
                 @NonNull CustomFile file
         ) {
-            this.file    = file;
+            this.file = file;
             this.details = file.name + ": Pending...";
         }
 
@@ -825,12 +826,12 @@ public class XferActivity extends AppCompatActivity {
         @NonNull
         public String buildDetails(Throwable error) {
             return error != null
-                   ? String.format(
+                    ? String.format(
                     Locale.getDefault(),
                     "Error happened: %s",
                     error.getLocalizedMessage()
             )
-                   : "Man fuck off!";
+                    : "Man fuck off!";
         }
 
         public Section complete(String resp) {

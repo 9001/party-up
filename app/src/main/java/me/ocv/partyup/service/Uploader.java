@@ -25,24 +25,24 @@ import me.ocv.partyup.objects.CustomFile;
 import me.ocv.partyup.utils.NetworkUtils;
 
 public class Uploader {
-    private static final String             TAG            = "Uploader";
-    private final        String             serverUrl;
-    private final        String             password;
-    private final        OnCompleteListener onComplete;
-    private final        OnErrorListener    onError;
-    private final        OnProgressListener onProgress;
-    private final        Context            context;
-    private final        int                chunkSize;
-    private              StringBuilder      serverResponse = new StringBuilder();
+    private static final String TAG = "Uploader";
+    private final String serverUrl;
+    private final String password;
+    private final OnCompleteListener onComplete;
+    private final OnErrorListener onError;
+    private final OnProgressListener onProgress;
+    private final Context context;
+    private final int chunkSize;
+    private StringBuilder serverResponse = new StringBuilder();
 
     private Uploader(@NonNull Builder builder) {
-        this.serverUrl  = builder.serverUrl;
-        this.password   = builder.serverPassword;
-        this.context    = builder.context;
-        this.onError    = builder.onError;
+        this.serverUrl = builder.serverUrl;
+        this.password = builder.serverPassword;
+        this.context = builder.context;
+        this.onError = builder.onError;
         this.onProgress = builder.onProgress;
         this.onComplete = builder.onComplete;
-        this.chunkSize  = builder.chunkSize;
+        this.chunkSize = builder.chunkSize;
     }
 
     public void upload(CustomFile cf) throws Exception {
@@ -111,7 +111,7 @@ public class Uploader {
             BaseUploadProgress up = new BaseUploadProgress();
             up.total = cf.size;
             up.delta = this.chunkSize;
-            up.done  = 0;
+            up.done = 0;
 
             int n;
             while ((n = ins.read(buf, 0, buf.length)) != -1) {
@@ -139,10 +139,10 @@ public class Uploader {
             if (up.done != up.total) {
                 Log.e(TAG, "size mismatch", new IOException(
                         "Size mismatch: expected=" + cf.size +
-                        " actual=" + up.done
+                                " actual=" + up.done
                 ));
             }
-            
+
             up.total = up.done;
             this.onProgress.run(up);
         }
@@ -179,7 +179,7 @@ public class Uploader {
         }
 
         String[] lines = serverResponse.toString()
-                                       .split("\n");
+                .split("\n");
         if (lines.length < 3) {
             this.onError.run(new RuntimeException("SERVER ERROR:\n" + lines[0]));
             return false;
@@ -188,7 +188,7 @@ public class Uploader {
         if (lines[2].indexOf(sha.toString()) != 0) {
             this.onError.run(new RuntimeException(
                     "ERROR:\nFile got corrupted during the upload;\n\n" + lines[2] + " expected\n" +
-                    sha + " from server"));
+                            sha + " from server"));
             return false;
         }
 
@@ -228,7 +228,7 @@ public class Uploader {
         BaseUploadProgress up = new BaseUploadProgress();
         up.delta = body.length;
         up.total = body.length;
-        up.done  = body.length;
+        up.done = body.length;
 
         Log.d(
                 TAG,
@@ -262,7 +262,7 @@ public class Uploader {
 
         if (serverResponse.length() > 0) {
             cf.share_url = serverResponse.toString()
-                                         .trim();
+                    .trim();
         } else {
             cf.share_url = "Server not happy!";
         }
@@ -309,13 +309,13 @@ public class Uploader {
 
     public static final class Builder {
         private static final int MIN_CHUNK_SIZE = 128 * 1024;
-        private final Context            context;
-        private       OnErrorListener    onError        = null;
-        private       OnProgressListener onProgress     = null;
-        private       OnCompleteListener onComplete     = null;
-        private       String             serverUrl      = null;
-        private       String             serverPassword = null;
-        private       int                chunkSize      = MIN_CHUNK_SIZE;
+        private final Context context;
+        private OnErrorListener onError = null;
+        private OnProgressListener onProgress = null;
+        private OnCompleteListener onComplete = null;
+        private String serverUrl = null;
+        private String serverPassword = null;
+        private int chunkSize = MIN_CHUNK_SIZE;
 
         public Builder(
                 @NonNull Context context
@@ -377,7 +377,7 @@ public class Uploader {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy Q MM dd DDD HH mm ss", Locale.US);
                 sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
                 String[] dtp = sdf.format(new Date())
-                                  .split(" ");
+                        .split(" ");
 
                 for (int a = 0; a < dtc.length; a++) {
                     this.serverUrl = this.serverUrl.replace(dtc[a], dtp[a]);

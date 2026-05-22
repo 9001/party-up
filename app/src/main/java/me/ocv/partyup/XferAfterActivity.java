@@ -25,10 +25,10 @@ import java.io.Serializable;
 import me.ocv.partyup.utils.ToastUtils;
 
 public class XferAfterActivity extends AppCompatActivity {
-    public static final String ACTION_KEY    = "action";
+    public static final String ACTION_KEY = "action";
     public static final String SHARE_URL_KEY = "share_url";
-    private static final String TAG     = "TransferAfter";
-    private static final int    QR_SIZE = 256;
+    private static final String TAG = "TransferAfter";
+    private static final int QR_SIZE = 256;
 
     @Override
     protected void onCreate(
@@ -112,15 +112,15 @@ public class XferAfterActivity extends AppCompatActivity {
             shownImage.setImageBitmap(shareQr);
             shownImage.setLayoutParams(new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                                                                  ViewGroup.LayoutParams.WRAP_CONTENT
+                    ViewGroup.LayoutParams.WRAP_CONTENT
             ));
             shownImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
             shownImage.setAdjustViewBounds(true);
 
             AlertDialog dialog = new AlertDialog.Builder(this).setView(shownImage)
-                                                              .setCancelable(true)
-                                                              .setOnDismissListener(d -> finishAndRemoveTask())
-                                                              .create();
+                    .setCancelable(true)
+                    .setOnDismissListener(d -> finishAndRemoveTask())
+                    .create();
 
             dialog.show();
 

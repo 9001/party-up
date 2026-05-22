@@ -16,13 +16,12 @@ import java.util.List;
 public class PermissionUtils {
 
     public static final int READ_EXTERNAL_STORAGE_REQUEST_CODE = 573;
-    public static final int ALL_PERMISSIONS_REQUEST_CODE       = 100;
+    public static final int ALL_PERMISSIONS_REQUEST_CODE = 100;
 
     /**
      * Checks for storage permission and requests it if it's not granted.
      *
      * @param activity The activity to use for checking and requesting permissions.
-     *
      * @return true if the permission is already granted, false otherwise.
      */
     public static boolean checkAndRequestStoragePermission(Activity activity) {
@@ -44,7 +43,7 @@ public class PermissionUtils {
     public static void requestStoragePermission(Activity activity) {
         ActivityCompat.requestPermissions(
                 activity,
-                new String[] { Manifest.permission.READ_EXTERNAL_STORAGE },
+                new String[]{ Manifest.permission.READ_EXTERNAL_STORAGE },
                 READ_EXTERNAL_STORAGE_REQUEST_CODE
         );
     }
@@ -53,7 +52,7 @@ public class PermissionUtils {
         String[] permissions = getManifestPermissions(activity);
         for (String permission : permissions) {
             if (ContextCompat.checkSelfPermission(activity, permission) !=
-                PackageManager.PERMISSION_GRANTED) {
+                    PackageManager.PERMISSION_GRANTED) {
                 return false;
             }
         }
@@ -65,10 +64,10 @@ public class PermissionUtils {
     ) {
         try {
             PackageInfo info = activity.getPackageManager()
-                                       .getPackageInfo(
-                                               activity.getPackageName(),
-                                               PackageManager.GET_PERMISSIONS
-                                       );
+                    .getPackageInfo(
+                            activity.getPackageName(),
+                            PackageManager.GET_PERMISSIONS
+                    );
             if (info.requestedPermissions != null) {
                 return info.requestedPermissions;
             }
@@ -83,7 +82,7 @@ public class PermissionUtils {
         List<String> permissionsToRequest = new ArrayList<>();
         for (String permission : permissions) {
             if (ContextCompat.checkSelfPermission(activity, permission) !=
-                PackageManager.PERMISSION_GRANTED) {
+                    PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(permission);
             }
         }

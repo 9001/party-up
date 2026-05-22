@@ -56,7 +56,7 @@ public final class Analyzer {
         } else {
             Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
             if (uri != null) {
-                handles = new Uri[] { uri };
+                handles = new Uri[]{ uri };
             } else {
                 the_msg = intent.getStringExtra(Intent.EXTRA_TEXT);
             }
@@ -67,7 +67,7 @@ public final class Analyzer {
             for (Uri uri : handles) {
                 CustomFile cf = new CustomFile();
                 cf.handle = uri;
-                cf.mime   = eType;
+                cf.mime = eType;
                 parseFile(cf);
 
                 if (cf.size == null) {
@@ -80,8 +80,8 @@ public final class Analyzer {
             // only text files
             CustomFile cf = new CustomFile();
             cf.content = the_msg;
-            cf.mime    = "text/plain";
-            cf.size    = (long) the_msg.length();
+            cf.mime = "text/plain";
+            cf.size = (long) the_msg.length();
 
             files.add(cf);
         } else {
@@ -102,12 +102,12 @@ public final class Analyzer {
         } else {
             try (
                     Cursor cur = this.context.getContentResolver()
-                                             .query(
-                                                     cf.handle, new String[] {
-                                                             OpenableColumns.DISPLAY_NAME,
-                                                             OpenableColumns.SIZE
-                                                     }, null, null, null
-                                             )
+                            .query(
+                                    cf.handle, new String[]{
+                                            OpenableColumns.DISPLAY_NAME,
+                                            OpenableColumns.SIZE
+                                    }, null, null, null
+                            )
             ) {
 
                 if (cur != null && cur.moveToFirst()) {
@@ -139,7 +139,7 @@ public final class Analyzer {
         // get correct file size
         try (
                 InputStream ins = this.context.getContentResolver()
-                                              .openInputStream(cf.handle)
+                        .openInputStream(cf.handle)
         ) {
             assert ins != null;
             byte[] buf = new byte[128 * 1024];
@@ -165,10 +165,10 @@ public final class Analyzer {
 
         if (md != null) {
             String cSum = Base64.encodeToString(
-                                        md.digest(),
-                                        Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP
-                                )
-                                .substring(0, 15);
+                            md.digest(),
+                            Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP
+                    )
+                    .substring(0, 15);
             cf.name = String.format("mystery-file-%s.%s", cSum, cf.ext);
         }
 
@@ -187,7 +187,7 @@ public final class Analyzer {
         }
 
         mime = mime.replace(';', ' ')
-                   .split(" ")[0];
+                .split(" ")[0];
 
         switch (mime) {
             case "audio/ogg":
