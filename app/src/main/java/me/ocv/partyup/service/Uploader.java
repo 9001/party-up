@@ -7,6 +7,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
@@ -31,21 +32,22 @@ public class Uploader {
     private final        OnErrorListener    onError;
     private final        OnProgressListener onProgress;
     private final        Context            context;
+    private final        int                chunkSize;
     private              StringBuilder      serverResponse = new StringBuilder();
 
-    private Uploader(Builder builder) {
+    private Uploader(@NonNull Builder builder) {
         this.serverUrl  = builder.serverUrl;
         this.password   = builder.serverPassword;
         this.context    = builder.context;
         this.onError    = builder.onError;
         this.onProgress = builder.onProgress;
         this.onComplete = builder.onComplete;
+        this.chunkSize  = builder.chunkSize;
     }
 
     public void upload(CustomFile cf) throws Exception {
         HttpURLConnection conn = makeConnection(cf);
-        cf.full_url = conn.getURL()
-                          .toString();
+        cf.full_url = conn.getURL().toString();
 
         Log.d(TAG, String.format("Uploading started of file: %s", cf));
         boolean uploadSuccess;
@@ -58,6 +60,7 @@ public class Uploader {
             uploadSuccess = this.uploadFile(cf, conn);
         }
 
+        Log.d(TAG, "informing complete");
         this.onComplete.run(serverResponse.toString());
         Log.i(
                 TAG,
@@ -90,39 +93,35 @@ public class Uploader {
         );
 
         conn.setRequestMethod("PUT");
-        conn.setFixedLengthStreamingMode(cf.size);
         conn.setRequestProperty("Content-Type", "application/octet-stream");
+        conn.setChunkedStreamingMode(this.chunkSize);
+
+        MessageDigest md = MessageDigest.getInstance("SHA-512");
         conn.connect();
 
-        OutputStream os = conn.getOutputStream();
         try (
-                InputStream ins = this.context.getContentResolver()
-                                              .openInputStream(cf.handle)
+                InputStream ins = this.context.getContentResolver().openInputStream(cf.handle);
+                OutputStream os = conn.getOutputStream()
         ) {
             if (ins == null) {
                 throw new RuntimeException("Input stream is null!");
             }
-            MessageDigest md = MessageDigest.getInstance("SHA-512");
-
-            byte[] buf = new byte[128 * 1024];
+            byte[] buf = new byte[this.chunkSize];
 
             BaseUploadProgress up = new BaseUploadProgress();
             up.total = cf.size;
+            up.delta = this.chunkSize;
             up.done  = 0;
-            up.delta = 0;
 
-            while (true) {
-                int n = ins.read(buf);
-                if (n == -1) {
-                    break;
-                }
+            int n;
+            while ((n = ins.read(buf, 0, buf.length)) != -1) {
+                up.done += n;
+
+                Log.d(TAG, String.format("read %d bytes now writing...", n));
 
                 os.write(buf, 0, n);
                 md.update(buf, 0, n);
 
-                up.delta = n;
-                up.done += n;
-                this.onProgress.run(up);
                 Log.d(
                         TAG,
                         String.format(
@@ -132,32 +131,47 @@ public class Uploader {
                                 up.done
                         )
                 );
+
+                Log.d(TAG, "informing listener");
+                this.onProgress.run(up);
             }
 
-            os.flush();
-            serverResponse = NetworkUtils.readConnection(conn);
-
-            int rc = conn.getResponseCode();
-            if (rc >= 300) {
-                String message = String.format(
-                        Locale.getDefault(),
-                        "[%d] Server error:\n%s",
-                        rc,
-                        serverResponse.toString()
-                );
-                this.onError.run(new RuntimeException(message));
-                conn.disconnect();
-                return false;
+            if (up.done != up.total) {
+                Log.e(TAG, "size mismatch", new IOException(
+                        "Size mismatch: expected=" + cf.size +
+                        " actual=" + up.done
+                ));
             }
-
-            return uploadSuccess(md, cf);
+            
+            up.total = up.done;
+            this.onProgress.run(up);
         }
+
+        Log.d(TAG, "reading connection...");
+        int rc = conn.getResponseCode();
+        serverResponse = NetworkUtils.readConnection(conn);
+        Log.d(TAG, "connection read!");
+
+        if (rc >= 300) {
+            String message = String.format(
+                    Locale.getDefault(),
+                    "[%d] Server error:\n%s",
+                    rc,
+                    serverResponse.toString()
+            );
+            this.onError.run(new RuntimeException(message));
+            conn.disconnect();
+            return false;
+        }
+
+        return uploadSuccess(md, cf);
     }
 
     private boolean uploadSuccess(
             @NonNull MessageDigest md,
             CustomFile cf
     ) {
+        Log.d(TAG, "determining success");
         StringBuilder sha = new StringBuilder();
         byte[] bSha = md.digest();
         for (int a = 0; a < 28; a++) {
@@ -280,34 +294,40 @@ public class Uploader {
     }
 
     @FunctionalInterface
-    public interface OnCompleteListener {
-        void run(String response);
-
+    public interface Listener<T> {
+        void run(T listen);
     }
 
     @FunctionalInterface
-    public interface OnErrorListener {
-        void run(Throwable error);
-
-    }
+    public interface OnCompleteListener extends Listener<String> {}
 
     @FunctionalInterface
-    public interface OnProgressListener {
-        void run(BaseUploadProgress error);
+    public interface OnErrorListener extends Listener<Throwable> {}
 
-    }
+    @FunctionalInterface
+    public interface OnProgressListener extends Listener<BaseUploadProgress> {}
+
     public static final class Builder {
+        private static final int MIN_CHUNK_SIZE = 128 * 1024;
         private final Context            context;
         private       OnErrorListener    onError        = null;
         private       OnProgressListener onProgress     = null;
         private       OnCompleteListener onComplete     = null;
         private       String             serverUrl      = null;
         private       String             serverPassword = null;
+        private       int                chunkSize      = MIN_CHUNK_SIZE;
 
         public Builder(
                 @NonNull Context context
         ) {
             this.context = context.getApplicationContext();
+        }
+
+        public Builder setChunkSize(
+                int chunkSize
+        ) {
+            this.chunkSize = Math.max(chunkSize, MIN_CHUNK_SIZE);
+            return this;
         }
 
         public Builder setOnComplete(
