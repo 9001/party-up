@@ -2,16 +2,21 @@ package me.ocv.partyup;
 
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.text.InputType;
 import android.view.MenuItem;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
-import android.widget.Toast;
-
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.EditTextPreference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
+import androidx.preference.SwitchPreference;
+
+import me.ocv.partyup.objects.PrefsKey;
+import me.ocv.partyup.utils.SoundUtils;
+import me.ocv.partyup.utils.ToastUtils;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -20,8 +25,7 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
         if (savedInstanceState == null) {
-            getSupportFragmentManager()
-                    .beginTransaction()
+            getSupportFragmentManager().beginTransaction()
                     .replace(R.id.settings, new SettingsFragment())
                     .commit();
         }
@@ -30,50 +34,108 @@ public class SettingsActivity extends AppCompatActivity {
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        if (prefs.getString("on_up_ok", "menu").equals("menu")) {
+        if (prefs.getString(PrefsKey.ON_UP_OK, "menu")
+                .equals("menu")) {
             SharedPreferences.Editor ed = prefs.edit();
-            ed.putString("on_up_ok", "menu");
-            ed.commit();
+            ed.putString(PrefsKey.ON_UP_OK, "menu");
+            ed.apply();
         }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(
+            @NonNull MenuItem item
+    ) {
+        if (item.getItemId() == android.R.id.home) {
+            super.getOnBackPressedDispatcher()
+                    .onBackPressed();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     public static class SettingsFragment extends PreferenceFragmentCompat {
         @Override
-        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
+        public void onCreatePreferences(
+                Bundle savedInstanceState,
+                String rootKey
+        ) {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
-            EditTextPreference surl = findPreference("server_url");
-            if (surl != null) {
-                surl.setDialogMessage("to upload into a folder, add the folder at the end of the URL, for example “https://ask.com/foo/bar/”\n\nExample: “https://ask.com/%Y/%m/” will create\n“/Year/month/” (%Y/%m/%d, %H:%M:%S)");
+            SwitchPreference beMute = findPreference(PrefsKey.SHUT_UP);
+            if (beMute != null) {
+                beMute.setOnPreferenceChangeListener((p, n) -> {
+                    SoundUtils.toggleShut((boolean) n);
+                    return true;
+                });
             }
 
-            EditTextPreference passwd = findPreference("server_password");
+            SwitchPreference beSilent = findPreference(PrefsKey.BE_SILENT);
+            SwitchPreference autoSend = findPreference(PrefsKey.AUTOSEND);
+
+            if (beSilent != null && autoSend != null) {
+                beSilent.setOnPreferenceChangeListener((p, n) -> {
+                    boolean enabled = (Boolean) n;
+                    if (enabled) {
+                        autoSend.setChecked(true);   // force ON
+                        autoSend.setEnabled(false);  // lock it
+                    } else {
+                        autoSend.setEnabled(true);   // unlock
+                    }
+                    return true;
+                });
+
+                boolean enabled = beSilent.isChecked();
+                autoSend.setEnabled(!enabled);
+                if (enabled) {
+                    autoSend.setChecked(true);
+                }
+            }
+
+            SwitchPreference darkMode = findPreference(PrefsKey.DARK_MODE);
+            if (darkMode != null) {
+                darkMode.setOnPreferenceChangeListener((preference, newValue) -> {
+                    boolean enabled = (Boolean) newValue;
+
+                    if (enabled) {
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+                    } else {
+                        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+                    }
+
+                    return true;
+                });
+            }
+
+            EditTextPreference sUrl = findPreference(PrefsKey.SERVER_URL);
+            if (sUrl != null) {
+                sUrl.setDialogMessage(getString(R.string.server_url_help));
+            }
+
+            EditTextPreference passwd = findPreference(PrefsKey.SERVER_PASSWORD);
             if (passwd != null) {
                 passwd.setSummaryProvider(preference -> {
-                    if (passwd.getText() == null || passwd.getText().isEmpty()) {
-                        return "Password is not set";
+                    if (passwd.getText() == null || passwd.getText()
+                            .isEmpty()) {
+                        return getString(R.string.setting_password_empty);
                     } else {
-                        return "Click to change password";
+                        return getString(R.string.setting_password_success);
                     }
                 });
                 passwd.setOnBindEditTextListener(editText -> {
                     editText.setInputType(
-                            InputType.TYPE_CLASS_TEXT |
-                                    InputType.TYPE_TEXT_VARIATION_PASSWORD
-                    );
+                            InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                     editText.setOnLongClickListener(view -> {
-                        editText.setInputType(
-                                InputType.TYPE_CLASS_TEXT
-                        );
+                        editText.setInputType(InputType.TYPE_CLASS_TEXT);
                         editText.setOnLongClickListener(null);
                         return true;
                     });
                 });
 
-                passwd.setDialogMessage("if server has enabled login using usernames, input “<username>:<password>”,\nfor example azure:hunter2\n\nLong-press to reveal the password");
+                passwd.setDialogMessage(getString(R.string.server_password_help));
             }
 
-            EditTextPreference linkExp = findPreference("link_expiration");
+            EditTextPreference linkExp = findPreference(PrefsKey.LINK_EXPIRATION);
             if (linkExp != null) {
                 // Use SummaryProvider for dynamic summary
                 linkExp.setSummaryProvider(preference -> {
@@ -86,7 +148,7 @@ public class SettingsActivity extends AppCompatActivity {
                     String value = (String) newValue;
                     String error = validateExpiration(value);
                     if (error != null) {
-                        Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+                        ToastUtils.show(getContext(), error);
                         return false;
                     }
                     return true;
@@ -95,23 +157,31 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         private String validateExpiration(String value) {
-            if (value == null || value.trim().isEmpty())
+            if (value == null || value.trim()
+                    .isEmpty()) {
                 return null; // Empty is valid (never expires)
+            }
 
-            value = value.trim().toLowerCase();
-            if (value.matches("^\\d+[mhd]?$"))
+            value = value.trim()
+                    .toLowerCase();
+            if (value.matches("^\\d+[mhd]?$")) {
                 return null; // Valid format
+            }
 
-            return "Invalid format. Use: 30m, 2h, 7d, or empty for never";
+            return getString(R.string.invalid_expiration);
         }
 
         private String getExpSummaryText(String value) {
-            if (value == null || value.trim().isEmpty())
-                return "Never expires";
+            if (value == null || value.trim()
+                    .isEmpty()) {
+                return getString(R.string.default_expiration);
+            }
 
-            value = value.trim().toLowerCase();
-            if (!value.matches("^\\d+[mhd]?$"))
-                return "Invalid format";
+            value = value.trim()
+                    .toLowerCase();
+            if (!value.matches("^\\d+[mhd]?$")) {
+                return getString(R.string.invalid_expiration);
+            }
 
             char unit = value.charAt(value.length() - 1);
             int num;
@@ -123,20 +193,17 @@ public class SettingsActivity extends AppCompatActivity {
             }
 
             switch (unit) {
-                case 'm': return num + " minute" + (num != 1 ? "s" : "");
-                case 'h': return num + " hour" + (num != 1 ? "s" : "");
-                case 'd': return num + " day" + (num != 1 ? "s" : "");
-                default: return "Never expires";
+                case 'm':
+                    return num + " minute" + (num != 1 ? "s" : "");
+                case 'h':
+                    return num + " hour" + (num != 1 ? "s" : "");
+                case 'd':
+                    return num + " day" + (num != 1 ? "s" : "");
+                default:
+                    return getString(R.string.default_expiration);
             }
         }
+
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            super.onBackPressed();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
 }

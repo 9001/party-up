@@ -1,0 +1,14 @@
+[versions]
+zixing-core = "3.5.4"
+agp = "9.0.1"
+preference = "1.2.1"
+material = "1.13.0"
+
+[libraries]
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+preference = { module = "androidx.preference:preference", version.ref = "preference" }
+zixing-core = { module = "com.google.zxing:core", version.ref = "zixing-core" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+dotenv = { id = "co.uzzu.dotenv.gradle", version = "4.0.0" }

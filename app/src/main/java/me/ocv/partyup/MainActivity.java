@@ -1,39 +1,110 @@
 package me.ocv.partyup;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.text.Html;
 import android.text.method.LinkMovementMethod;
-import android.view.View;
-import android.widget.Button;
-import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import me.ocv.partyup.databinding.ActivityMainBinding;
+import me.ocv.partyup.service.UploaderService;
+import me.ocv.partyup.utils.PermissionUtils;
+import me.ocv.partyup.utils.SoundUtils;
+import me.ocv.partyup.utils.ToastUtils;
 
 public class MainActivity extends AppCompatActivity {
+    private UploaderService mService;
+    private ActivityMainBinding binding;
+    private boolean serviceKilled;
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(
+                ComponentName componentName,
+                IBinder iBinder
+        ) {
+            UploaderService.UploadBinder binder = (UploaderService.UploadBinder) iBinder;
+            mService = binder.getService();
+            serviceConnected();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+        }
+    };
+
+    private void serviceConnected() {
+        binding.stopServBtn.post(() -> {
+            binding.stopServBtn.setEnabled(true);
+            binding.stopServBtn.setOnClickListener(v -> {
+                if (mService == null) {
+                    return;
+                }
+                if (serviceKilled) {
+                    ToastUtils.show(MainActivity.this, "Service killed!");
+                } else {
+                    mService.stop();
+                    serviceKilled = true;
+                    binding.stopServBtn.setEnabled(false);
+                    SoundUtils.playServiceKilled();
+                }
+            });
+        });
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        Intent intent = new Intent(this, UploaderService.class);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getApplicationContext().startForegroundService(intent);
+        } else {
+            getApplicationContext().startService(intent);
+        }
+
+        bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        if (!PermissionUtils.hasAllPermissions(this)) {
+            PermissionUtils.requestAllPermissions(this);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (mService != null) {
+            unbindService(connection);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        binding = ActivityMainBinding.inflate(getLayoutInflater());
 
-        String txt = "<p><em>Hello from <a href=\"https://github.com/9001/party-up\">Party UP!</a> <b>version " + BuildConfig.VERSION_NAME + "</b></em></p>" +
-                "<p>This app lets you upload files (images, videos) to a <a href=\"https://github.com/9001/copyparty#quickstart\">copyparty</a> server.</p>" +
-                "<hr />" +
-                "<p><b>Use your favorite gallery app to open a picture or video you'd like to upload, then hit the share button and select \"Party UP!\" \uD83C\uDF89</b></p>" +
-                "<p>You can also share things like youtube videos; the app will then upload a message with the link. The copyparty server can be configured to log these for later viewing.</p>" +
-                "<p>Funfact: You can run the copyparty server itself on any device where Python is available -- and thanks to <a href=\"https://f-droid.org/en/packages/com.termux/\">Termux</a> this also means Android phones :^)</p>";
+        setContentView(binding.getRoot());
+        String txt = String.format(getString(R.string.welcome_text), BuildConfig.VERSION_NAME);
 
-        TextView tv = ((TextView)findViewById(R.id.textView4));
-        tv.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
-        tv.setMovementMethod(LinkMovementMethod.getInstance());
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            binding.textView4.setText(Html.fromHtml(txt, Html.FROM_HTML_MODE_LEGACY));
+        } else {
+            binding.textView4.setText(Html.fromHtml(txt));
+        }
+        binding.textView4.setMovementMethod(LinkMovementMethod.getInstance());
 
-        ((Button)findViewById(R.id.settingsBtn)).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent i = new Intent(MainActivity.this, SettingsActivity.class);
-                startActivity(i);
-            }
-        });
+        binding.settingsBtn.setOnClickListener(v -> startActivity(new Intent(
+                this,
+                SettingsActivity.class
+        )));
+
+        binding.errBtn.setOnClickListener(v -> SoundUtils.playError());
+        binding.successBtn.setOnClickListener(v -> SoundUtils.playSuccess());
+        binding.bgBtn.setOnClickListener(v -> SoundUtils.playBackGround());
     }
+
 }

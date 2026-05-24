@@ -4,13 +4,14 @@
     android:layout_height="match_parent">
 
     <ImageView
-        android:id="@+id/animegirl"
+        android:id="@+id/anime_girl"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:scaleType="fitEnd"
         android:adjustViewBounds="true"
         android:alpha="0.2"
+        android:contentDescription="@string/anime_girl"
+        android:scaleType="fitEnd"
         app:srcCompat="@drawable/ame" />
 
     <FrameLayout

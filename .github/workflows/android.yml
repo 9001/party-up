@@ -1,0 +1,58 @@
+name: Android CI
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+        check-latest: true
+
+    - name: Decode jdk file
+      run: |
+        echo "${{ secrets.JKS_ENCODED }}" | base64 --decode > app/release.jks
+
+    - name: Create env file
+      run: |
+        echo "${{secrets.ENV_ENCODED}}" | base64 --decode > .env
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    
+    - name: Build with Gradle
+      run: ./gradlew app:assembleRelease
+
+    - name: Create release
+      uses: softprops/action-gh-release@v2
+      with:
+        # Uses the tag from the push event OR the manual input from workflow_dispatch
+        tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+        name: Release ${{ github.event.inputs.tag_name || github.ref_name }}
+        files: |
+          app/build/outputs/apk/release/*.apk
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
