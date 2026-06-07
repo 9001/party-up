@@ -570,7 +570,7 @@ public class XferActivity extends AppCompatActivity {
             for (int i = 0; i < 12; i++)
                 key.append(chars.charAt(random.nextInt(chars.length())));
 
-            URL url = new URL(f[0].full_url);
+            URL url = new URL(f[0].share_url);
 
             // Build share API URL (base URL without file path)
             String shareApiUrl = url.getProtocol() + "://" + url.getHost();
@@ -596,7 +596,7 @@ public class XferActivity extends AppCompatActivity {
 
             StringBuilder sharedFilesPaths = new StringBuilder();
             for (int i = 0; i < files.length; i++){
-                String filePath = java.net.URLDecoder.decode(new URL(f[i].full_url).getPath(), "UTF-8");
+                String filePath = java.net.URLDecoder.decode(new URL(f[i].share_url).getPath(), "UTF-8");
                 sharedFilesPaths.append("\"").append(filePath).append("\"");
                 if (i < files.length - 1){
                     sharedFilesPaths.append(",");
