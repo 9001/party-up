@@ -73,6 +73,13 @@ public class SettingsActivity extends AppCompatActivity {
                 passwd.setDialogMessage("if server has enabled login using usernames, input “<username>:<password>”,\nfor example azure:hunter2\n\nLong-press to reveal the password");
             }
 
+            EditTextPreference randNChars = findPreference("rand_chars");
+            if (randNChars != null) {
+                randNChars.setOnBindEditTextListener(editText -> {
+                    editText.setInputType(InputType.TYPE_CLASS_NUMBER);
+                });
+            }
+
             EditTextPreference linkExp = findPreference("link_expiration");
             if (linkExp != null) {
                 // Use SummaryProvider for dynamic summary

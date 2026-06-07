@@ -441,6 +441,8 @@ public class XferActivity extends AppCompatActivity {
                 conn.setDoOutput(true);
                 if (password != null)
                     conn.setRequestProperty("PW", password);
+                if (prefs.getBoolean("rand", false))
+                    conn.setRequestProperty("rand", prefs.getString("rand_chars", "9"));
 
                 if (files == null)
                     do_textmsg(conn);
